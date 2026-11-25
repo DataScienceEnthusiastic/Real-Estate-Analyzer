@@ -1,0 +1,6 @@
+pune_zone,quarters_to_sell,liquidity_tier,exit_discount_stress_pct,overhang_data_basis,overhang_source_url,avg_uc_delay_months,delay_data_basis,delay_source_url,vacancy_months_best,vacancy_months_avg,vacancy_months_worst,vacancy_data_basis,vacancy_source_url,last_updated
+Central,16.7,low,0.12,INSTITUTIONAL_REPORT,https://www.knightfrank.co.in/research/india-real-estate-office-and-residential-market-h1-2026,15,UNDERWRITING_ASSUMPTION,NULL,0.5,1.25,3.5,UNDERWRITING_ASSUMPTION,NULL,2026-11-22
+East,6.4,low,0.12,INSTITUTIONAL_REPORT,https://www.knightfrank.co.in/research/india-real-estate-office-and-residential-market-h1-2026,9,UNDERWRITING_ASSUMPTION,NULL,0.5,1.0,2.5,UNDERWRITING_ASSUMPTION,NULL,2026-11-22
+West,4.8,medium,0.08,INSTITUTIONAL_REPORT,https://www.knightfrank.co.in/research/india-real-estate-office-and-residential-market-h1-2026,8,UNDERWRITING_ASSUMPTION,NULL,0.5,1.0,2.5,UNDERWRITING_ASSUMPTION,NULL,2026-11-22
+South,0.2,high,0.05,INSTITUTIONAL_REPORT,https://www.knightfrank.co.in/research/india-real-estate-office-and-residential-market-h1-2026,12,UNDERWRITING_ASSUMPTION,NULL,0.5,1.5,4.0,UNDERWRITING_ASSUMPTION,NULL,2026-11-22
+North_PCMC,1.6,high,0.05,INSTITUTIONAL_REPORT,https://www.knightfrank.co.in/research/india-real-estate-office-and-residential-market-h1-2026,6,UNDERWRITING_ASSUMPTION,NULL,0.5,1.0,3.0,UNDERWRITING_ASSUMPTION,NULL,2026-11-22
