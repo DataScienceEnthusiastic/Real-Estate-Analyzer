@@ -8,6 +8,8 @@ embedded visual charts, and decision gate audits.
 from __future__ import annotations
 
 import io
+import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Optional
 
@@ -40,12 +42,14 @@ from src.charts import (
     create_amortization_chart,
     create_cash_flow_trajectory_chart,
     create_expected_value_chart,
+    create_micromarket_scatter_chart,
     create_sensitivity_heatmap,
     create_tornado_chart,
     create_wealth_trajectory_chart,
     format_inr,
     prepare_fig_for_pdf,
 )
+from src.data_loader import get_merged_dataset
 from src.models import (
     FinancingInput,
     InvestorProfile,
@@ -77,6 +81,14 @@ def fmt_inr_pdf(val: Optional[float]) -> str:
 _inr = fmt_inr_pdf
 
 
+_logger = logging.getLogger(__name__)
+
+
+def _render_plotly_png(fig_pdf: go.Figure, scale: float) -> bytes:
+    """Renders a prepared Plotly figure to PNG bytes."""
+    return fig_pdf.to_image(format="png", width=960, height=480, scale=scale)
+
+
 def _fig_to_reportlab_image(
     fig: go.Figure,
     width: float,
@@ -86,14 +98,15 @@ def _fig_to_reportlab_image(
     """Converts a Plotly Figure into a ReportLab Image Flowable with executive dark styling and unclipped margins."""
     try:
         fig_pdf = prepare_fig_for_pdf(fig)
-        img_bytes = fig_pdf.to_image(
-            format="png",
-            width=960,
-            height=480,
-            scale=scale,
-        )
+        try:
+            img_bytes = _render_plotly_png(fig_pdf, scale)
+        except Exception as first_err:
+            _logger.warning("Primary Kaleido render failed (%s); retrying in isolated thread.", first_err)
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                img_bytes = pool.submit(_render_plotly_png, fig_pdf, scale).result(timeout=45)
         return Image(io.BytesIO(img_bytes), width=width, height=height)
-    except Exception:
+    except Exception as exc:
+        _logger.warning("Failed to embed chart in PDF: %s", exc)
         return None
 
 
@@ -999,7 +1012,13 @@ def generate_underwriting_pdf(
     )
     appr_axis, esc_axis, irr_grid = compute_sensitivity_grid(property_obj, financing_obj, investor_obj, macro)
     im_heatmap = _fig_to_reportlab_image(
-        create_sensitivity_heatmap(appr_axis, esc_axis, irr_grid),
+        create_sensitivity_heatmap(
+            appr_axis,
+            esc_axis,
+            irr_grid,
+            current_appr_pct=property_obj.appreciation_rate * 100.0,
+            current_esc_pct=financing_obj.annual_rent_escalation_pct * 100.0,
+        ),
         width=255,
         height=165,
     )
@@ -1024,6 +1043,23 @@ def generate_underwriting_pdf(
     if im_ev:
         story.append(im_ev)
         story.append(Spacer(1, 8))
+
+    # VISUAL 8: Pune Micro-Market Yield vs Valuation Scatter Matrix
+    try:
+        merged_df = get_merged_dataset()
+        im_scatter = _fig_to_reportlab_image(
+            create_micromarket_scatter_chart(merged_df, property_obj.pincode, property_obj.bhk),
+            width=523,
+            height=220,
+        )
+        if im_scatter:
+            story.append(
+                Paragraph("<b>Visual Proof: Pune Micro-Market Yield vs Valuation Matrix</b>", style_sec_heading_sm)
+            )
+            story.append(im_scatter)
+            story.append(Spacer(1, 8))
+    except Exception as exc:
+        _logger.warning("Skipped micro-market scatter chart in PDF: %s", exc)
 
     # Data Provenance & Methodology Governance
     heading_sec9 = Paragraph("9. Institutional Data Provenance & Governance Audit", style_sec_heading)
