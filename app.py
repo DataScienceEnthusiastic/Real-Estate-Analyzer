@@ -336,6 +336,14 @@ loc_df = get_cached_loc_df()
 with st.sidebar:
     st.markdown("### 🏢 Pune Deal Underwriter")
     st.caption("Quantitative Decision Support Engine")
+    view_mode = st.radio(
+        "Experience Mode",
+        ["Simple Buyer Mode", "Pro Analyst Mode"],
+        index=0,
+        horizontal=True,
+        help="Simple Mode highlights plain-English answers and compact tables. Pro Mode unlocks full 12-column accounting schedules and live mathematical proofs.",
+    )
+    is_pro_mode = view_mode == "Pro Analyst Mode"
 
     # Tier 1: Property Selection & Market Lookup
     st.markdown("#### 1. Micro-Market & Configuration")
@@ -823,6 +831,10 @@ if selected_zone_filter == "All Zones" and all_ranked:
         )
         top_3_recs = all_ranked[:3]
         if top_3_recs:
+            def _select_recommended_locality(target_key: str) -> None:
+                st.session_state["selected_loc_key"] = target_key
+                st.session_state["active_benchmark_key"] = None
+
             rec_cols = st.columns(len(top_3_recs))
             for r_col, rec in zip(rec_cols, top_3_recs):
                 v_badge = "badge-green" if rec.verdict_status == "GO" else ("badge-amber" if rec.verdict_status == "CAUTION" else "badge-red")
@@ -862,11 +874,14 @@ if selected_zone_filter == "All Zones" and all_ranked:
                         unsafe_allow_html=True,
                     )
                     target_loc_key = f"{rec.pincode} - {rec.locality_name}"
-                    if st.button(f"🔍 Inspect PIN {rec.pincode} ({rec.locality_name})", key=f"inspect_rec_{rec.rank}_{rec.pincode}", width="stretch"):
-                        if target_loc_key in loc_display_map:
-                            st.session_state["selected_loc_key"] = target_loc_key
-                            st.session_state["active_benchmark_key"] = None
-                            st.rerun()
+                    if target_loc_key in loc_display_map:
+                        st.button(
+                            f"🔍 Inspect PIN {rec.pincode} ({rec.locality_name})",
+                            key=f"inspect_rec_{rec.rank}_{rec.pincode}",
+                            width="stretch",
+                            on_click=_select_recommended_locality,
+                            args=(target_loc_key,),
+                        )
 
             with st.expander("📊 View All 43 Ranked Pune Pincodes for Your Inputs", expanded=False):
                 rank_df = pd.DataFrame([
@@ -892,12 +907,52 @@ if selected_zone_filter == "All Zones" and all_ranked:
                 st.dataframe(rank_df, width="stretch", hide_index=True)
 
 # ---------------------------------------------------------
-# TOP HERO BANNER & MASTER VERDICT
+# TOP HERO BANNER, MASTER VERDICT & 10-SECOND BOTTOM-LINE BRIEF
 # ---------------------------------------------------------
 irr_display = f"{base_res.equity_irr_pct:.2f}%" if base_res.equity_irr_pct is not None else "N/A"
 real_irr_display = f"{base_res.real_equity_irr_pct:.2f}%" if base_res.real_equity_irr_pct is not None else "N/A"
 dscr_display = f"{base_res.year_1_dscr:.2f}x" if base_res.year_1_dscr is not None else "All-Cash"
+rent_cov_str = (
+    f"Rent Covers {base_res.year_1_dscr*100:.0f}% of EMI"
+    if base_res.year_1_dscr is not None
+    else "Zero-Debt All-Cash"
+)
 foir_pct = (investor_obj.existing_monthly_emis_inr + base_res.loan.monthly_emi) / investor_obj.net_monthly_income_inr * 100.0
+post_cash_hero = investor_obj.total_liquid_savings_inr - base_res.loan.required_upfront_cash
+m_obligations_hero = investor_obj.monthly_living_expenses_inr + investor_obj.existing_monthly_emis_inr + base_res.loan.monthly_emi
+buf_months_hero = max(0.0, post_cash_hero / m_obligations_hero) if m_obligations_hero > 0 else 0.0
+y1_monthly_cf = base_res.annual_cash_flows[0].net_cash_flow / 12.0
+fd_adv_hero = base_res.fd_benchmark.net_wealth_advantage_inr
+nifty_adv_hero = base_res.nifty_benchmark.net_wealth_advantage_inr
+
+if post_cash_hero < 0:
+    watchout_msg = f"Upfront cash shortfall of <b>{format_inr(abs(post_cash_hero))}</b> — reduce price/LTV or save more before buying."
+elif foir_pct > 50.0:
+    watchout_msg = f"High EMI burden (<b>{foir_pct:.1f}%</b> of salary > 50% ceiling) — vulnerable to interest rate hikes."
+elif use_case == "investment_rental" and base_res.year_1_dscr is not None and base_res.year_1_dscr < 0.50:
+    watchout_msg = f"Rent covers only <b>{base_res.year_1_dscr*100:.0f}%</b> of your EMI; you must subsidize <b>{format_inr(abs(y1_monthly_cf))}/mo</b> from salary in Year 1."
+elif property_obj.liquidity_tier.lower() == "low":
+    watchout_msg = f"Slow resale market in {defaults.pune_zone} Zone (~<b>{defaults.quarters_to_sell:.1f} quarters</b> inventory overhang) — plan to hold 7+ years."
+elif (base_res.equity_irr_pct or 0.0) <= base_res.fd_benchmark.annual_return_pct:
+    watchout_msg = f"Returns ({irr_display}) lag a safe bank FD ({base_res.fd_benchmark.annual_return_pct:.2f}%/yr) — only buy for personal use or negotiate a lower price."
+else:
+    watchout_msg = "Financially balanced deal — monitor floating home loan rate changes and tenant occupancy."
+
+wallet_pocket_str = (
+    f"pay <b style='color:#fbbf24;'>{format_inr(abs(y1_monthly_cf))}/mo</b> out-of-pocket"
+    if y1_monthly_cf < 0
+    else f"pocket <b style='color:#34d399;'>+{format_inr(y1_monthly_cf)}/mo</b> surplus"
+)
+fd_cmp_str = (
+    f"<b style='color:#34d399;'>+{format_inr(fd_adv_hero)} more</b> than SBI FD"
+    if fd_adv_hero >= 0
+    else f"<b style='color:#f87171;'>{format_inr(abs(fd_adv_hero))} less</b> than SBI FD"
+)
+nifty_cmp_str = (
+    f"<b style='color:#34d399;'>+{format_inr(nifty_adv_hero)} more</b> than Nifty 50"
+    if nifty_adv_hero >= 0
+    else f"<b style='color:#f87171;'>{format_inr(abs(nifty_adv_hero))} less</b> than Nifty 50"
+)
 
 st.markdown(
     f"""
@@ -912,17 +967,17 @@ st.markdown(
                     {sel_loc_name} <span style="font-weight: 400; font-size: 1.35rem; color: #94a3b8;">({use_case.replace('_', ' ').title()})</span>
                 </h1>
                 <p style="margin: 0; font-size: 0.94rem; color: #cbd5e1; line-height: 1.6;">
-                    All-In Cost: <b style="color: #ffffff;">{format_inr(base_res.acquisition.all_in_acquisition_cost)}</b> &nbsp;|&nbsp;
-                    Upfront Equity: <b style="color: #ffffff;">{format_inr(base_res.loan.required_upfront_cash)}</b> &nbsp;|&nbsp;
-                    Monthly EMI: <b style="color: #ffffff;">{format_inr(base_res.loan.monthly_emi)}</b> (FOIR: <b style="color: {'#34d399' if foir_pct <= 40 else ('#fbbf24' if foir_pct <= 50 else '#f87171')}">{foir_pct:.1f}%</b>) &nbsp;|&nbsp;
-                    Base IRR: <b style="color: {'#34d399' if (base_res.equity_irr_pct or 0) > 8 else '#ffffff'}">{irr_display}</b> (<span style="color:#94a3b8;">Real:</span> <b style="color:#cbd5e1;">{real_irr_display}</b>) &nbsp;|&nbsp;
-                    Yr-1 DSCR: <b style="color:#cbd5e1;">{dscr_display}</b>
+                    Total Cost (incl. Taxes): <b style="color: #ffffff;">{format_inr(base_res.acquisition.all_in_acquisition_cost)}</b> &nbsp;|&nbsp;
+                    Upfront Cash Needed: <b style="color: #ffffff;">{format_inr(base_res.loan.required_upfront_cash)}</b> &nbsp;|&nbsp;
+                    EMI: <b style="color: #ffffff;">{format_inr(base_res.loan.monthly_emi)}/mo</b> (<b style="color: {'#34d399' if foir_pct <= 40 else ('#fbbf24' if foir_pct <= 50 else '#f87171')}">{foir_pct:.1f}%</b> of income) &nbsp;|&nbsp;
+                    Annual Return: <b style="color: {'#34d399' if (base_res.equity_irr_pct or 0) > 8 else '#ffffff'}">{irr_display}</b> (<span style="color:#94a3b8;">After Inflation:</span> <b style="color:#cbd5e1;">{real_irr_display}</b>) &nbsp;|&nbsp;
+                    <b style="color:#cbd5e1;">{rent_cov_str}</b>
                 </p>
             </div>
             <div style="margin-top: 4px;">
                 <div class="verdict-box verdict-{verdict.status.lower().replace('-', '')}" style="padding: 14px 28px; min-width: 230px; text-align: center;">
                     <div>
-                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 800; opacity: 0.9;">Underwriting Verdict</div>
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 800; opacity: 0.9;">Buy / No-Buy Verdict</div>
                         <div style="font-size: 1.75rem; font-weight: 900; letter-spacing: 0.03em;">
                             {'🟢' if verdict.status == 'GO' else ('🟡' if verdict.status == 'CAUTION' else '🔴')} {verdict.status}
                         </div>
@@ -930,18 +985,24 @@ st.markdown(
                 </div>
             </div>
         </div>
-        <div style="display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap;">
+        <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid #334155; border-left: 4px solid #38bdf8; border-radius: 8px; padding: 12px 16px; margin-top: 14px; font-size: 0.88rem; color: #e2e8f0; line-height: 1.55;">
+            <div style="font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #38bdf8; margin-bottom: 4px;">⚡ 10-Second Plain-English Bottom Line</div>
+            <div>• <b>Wallet Check:</b> You need <b style="color:#ffffff;">{format_inr(base_res.loan.required_upfront_cash)}</b> upfront (leaving <b style="color:#ffffff;">{format_inr(max(0.0, post_cash_hero))}</b> emergency buffer = <b>{buf_months_hero:.1f} months</b>) and will {wallet_pocket_str} in Year 1.</div>
+            <div>• <b>Profit Check:</b> Selling after {holding_period} yrs leaves <b style="color:#ffffff;">{format_inr(base_res.exit.net_exit_proceeds)}</b> in hand — {fd_cmp_str} and {nifty_cmp_str} on identical cash invested.</div>
+            <div>• <b>#1 Watch-Out:</b> {watchout_msg}</div>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
             <span class="badge badge-{'green' if verdict.gates[0].status == 'PASS' else ('amber' if verdict.gates[0].status == 'WARN' else 'red')}">
-                Gate 1 (Affordability): {verdict.gates[0].status}
+                1. Can You Afford It?: {verdict.gates[0].status}
             </span>
             <span class="badge badge-{'green' if verdict.gates[1].status == 'PASS' else ('amber' if verdict.gates[1].status == 'WARN' else 'red')}">
-                Gate 2 (Downside Survival): {verdict.gates[1].status}
+                2. Survives Bad Market?: {verdict.gates[1].status}
             </span>
             <span class="badge badge-{'green' if verdict.gates[2].status == 'PASS' else ('amber' if verdict.gates[2].status == 'WARN' else 'red')}">
-                Gate 3 (Yield & Valuation): {verdict.gates[2].status}
+                3. Fair Price & Rent?: {verdict.gates[2].status}
             </span>
             <span class="badge badge-{'green' if verdict.gates[3].status == 'PASS' else ('amber' if verdict.gates[3].status == 'WARN' else 'red')}">
-                Gate 4 (Wealth Creation): {verdict.gates[3].status}
+                4. Beats FD & Nifty?: {verdict.gates[3].status}
             </span>
         </div>
     </div>
@@ -988,9 +1049,9 @@ with tab1:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">All-In Acquisition</div>
+                <div class="metric-label">Total Property Cost</div>
                 <div class="metric-value">{format_inr(base_res.acquisition.all_in_acquisition_cost)}</div>
-                <div class="metric-sub">Base: {format_inr(base_res.acquisition.agreement_value_inr)}</div>
+                <div class="metric-sub">Builder Price: {format_inr(base_res.acquisition.agreement_value_inr)}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1000,9 +1061,9 @@ with tab1:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Required Upfront Equity</div>
+                <div class="metric-label">Upfront Cash Needed</div>
                 <div class="metric-value">{format_inr(base_res.loan.required_upfront_cash)}</div>
-                <div class="metric-sub">Debt: {format_inr(base_res.loan.loan_amount)} ({base_res.loan.effective_ltv*100:.0f}% LTV)</div>
+                <div class="metric-sub">Bank Loan: {format_inr(base_res.loan.loan_amount)} ({base_res.loan.effective_ltv*100:.0f}% LTV)</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1012,9 +1073,9 @@ with tab1:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Base Monthly EMI</div>
+                <div class="metric-label">Monthly EMI Burden</div>
                 <div class="metric-value">{format_inr(base_res.loan.monthly_emi)}</div>
-                <div class="metric-sub">FOIR: {foir_pct:.1f}% ({'Safe' if foir_pct <= 40 else 'Elevated'})</div>
+                <div class="metric-sub">{foir_pct:.1f}% of Salary (Safe ≤40%)</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1027,21 +1088,22 @@ with tab1:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Post-Purchase Buffer</div>
+                <div class="metric-label">Emergency Cash Left</div>
                 <div class="metric-value">{buf_months:.1f} Mo</div>
-                <div class="metric-sub">Liquid: {format_inr(post_cash)}</div>
+                <div class="metric-sub">Buffer Left: {format_inr(post_cash)}</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     with kpi_c5:
+        rent_cov_pct_txt = f"Covers {base_res.year_1_dscr*100:.0f}% EMI" if base_res.year_1_dscr is not None else "All-Cash"
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Year-1 Yields & DSCR</div>
-                <div class="metric-value">{base_res.year_1_gross_yield_pct:.2f}%</div>
-                <div class="metric-sub">Net: {base_res.year_1_net_yield_pct:.2f}% · DSCR: {dscr_display}</div>
+                <div class="metric-label">Pure Rent Return (Yr 1)</div>
+                <div class="metric-value">{base_res.year_1_net_yield_pct:.2f}%</div>
+                <div class="metric-sub">Gross: {base_res.year_1_gross_yield_pct:.2f}% · {rent_cov_pct_txt}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1051,9 +1113,9 @@ with tab1:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Base Equity IRR</div>
+                <div class="metric-label">Your Annual Return (IRR)</div>
                 <div class="metric-value" style="color: {'#34d399' if (base_res.equity_irr_pct or 0) > 8 else '#ffffff'};">{irr_display}</div>
-                <div class="metric-sub">Real: {real_irr_display} · NPV: {format_inr(base_res.npv_inr)}</div>
+                <div class="metric-sub">After CPI: {real_irr_display} · NPV: {format_inr(base_res.npv_inr)}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1062,16 +1124,79 @@ with tab1:
     st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
 
     # 4-Gate Decision Audit Expandable Breakdown
-    st.markdown("### 🛡️ 4-Gate Decision Engine Audit")
+    st.markdown("### 🛡️ 4-Gate Decision Engine Audit (Plain-English Checklist)")
     gate_cols = st.columns(4)
+    gate_plain_titles = {
+        1: "Can You Afford It?",
+        2: "Survives Bad Market?",
+        3: "Fair Price & Rent?",
+        4: "Beats FD & Nifty?",
+    }
 
     for i, gate in enumerate(verdict.gates):
         badge_style = "badge-green" if gate.status == "PASS" else ("badge-amber" if gate.status == "WARN" else "badge-red")
+        plain_title = gate_plain_titles.get(gate.gate_number, gate.name)
         with gate_cols[i]:
-            with st.expander(f"Gate {gate.gate_number}: {gate.name} ({gate.status})", expanded=True):
-                st.markdown(f"<span class='badge {badge_style}'>{gate.status}</span>", unsafe_allow_html=True)
+            with st.expander(f"Gate {gate.gate_number}: {plain_title} ({gate.status})", expanded=True):
+                st.markdown(f"<span class='badge {badge_style}'>{gate.status}</span> <span style='font-size:0.78rem; color:#94a3b8;'>{gate.name}</span>", unsafe_allow_html=True)
                 for reason in gate.reasons:
                     st.markdown(f"- {reason}")
+
+    # Phase 3: Actionable Fix Suggestions when Verdict is CAUTION or NO-GO
+    if verdict.status != "GO":
+        fix_tips: list[str] = []
+        g1, g2, g3, g4 = verdict.gates
+        if g1.status != "PASS":
+            if post_cash_hero < 0:
+                fix_tips.append(
+                    f"**Fix Affordability (Gate 1):** You are short **{format_inr(abs(post_cash_hero))}** upfront — "
+                    f"consider a lower-priced area from the Top 3 Finder or increase your liquid down payment budget."
+                )
+            elif foir_pct > 40.0:
+                fix_tips.append(
+                    f"**Reduce EMI Burden (Gate 1):** EMI takes **{foir_pct:.1f}%** of salary — increasing down payment or extending loan tenure reduces monthly EMI."
+                )
+            else:
+                fix_tips.append(
+                    f"**Build Safety Cushion (Gate 1):** Post-purchase cash covers **{buf_months_hero:.1f} mo** — keep an extra reserve to hit your **{emergency_months_target:.0f}-month** target."
+                )
+        if g2.status != "PASS":
+            yr3_rec = float(g2.metrics.get("yr3_capital_recovery_pct", 100.0))
+            if yr3_rec < 75.0:
+                fix_tips.append(
+                    f"**Avoid Early Exit Loss (Gate 2):** Selling in Year 3 recovers only **{yr3_rec:.0f}%** of invested equity — commit to holding **5+ years** so appreciation covers stamp duty."
+                )
+            if float(g2.metrics.get("stressed_foir_200bps", 0.0)) > 50.0:
+                fix_tips.append(
+                    f"**Rate-Hike Protection (Gate 2):** A +2% loan rate hike pushes EMI to **{g2.metrics.get('stressed_foir_200bps', 0.0):.1f}%** of salary — keep extra cash reserves or prepay early."
+                )
+        if g3.status != "PASS":
+            mkt_rr_val = float(g3.metrics.get("market_to_rr_ratio", 1.0))
+            if mkt_rr_val > 2.50:
+                target_price = base_res.acquisition.rr_market_value * 2.50
+                disc_needed = max(0.0, (1.0 - target_price / base_res.acquisition.agreement_value_inr) * 100.0) if base_res.acquisition.agreement_value_inr > 0 else 0.0
+                fix_tips.append(
+                    f"**Negotiate Price (Gate 3):** Asking price is **{mkt_rr_val:.2f}×** Govt RR — negotiating **~{disc_needed:.0f}%** down toward {format_inr(target_price)} brings valuation into fair territory."
+                )
+            if use_case == "investment_rental" and base_res.year_1_net_yield_pct < 2.0:
+                fix_tips.append(
+                    f"**Boost Rental Yield (Gate 3):** Net yield is **{base_res.year_1_net_yield_pct:.2f}%** (< 2.0%) — compare higher-yield IT corridors in Tab 4 or use the All-Zones Top 3 Finder."
+                )
+        if g4.status != "PASS":
+            fd_r = base_res.fd_benchmark.annual_return_pct
+            hurdle_r = float(g4.metrics.get("risk_adjusted_hurdle_pct", fd_r + 4.0))
+            if (base_res.equity_irr_pct or 0.0) <= fd_r:
+                fix_tips.append(
+                    f"**Beat Bank FD (Gate 4):** Return (**{irr_display}**) trails safe SBI FD (**{fd_r:.2f}%**) — extend holding period, negotiate a lower price, or pick a higher-growth micro-market."
+                )
+            else:
+                fix_tips.append(
+                    f"**Improve Risk Premium (Gate 4):** Return (**{irr_display}**) beats FD (**{fd_r:.2f}%**) but is below the **{hurdle_r:.2f}%** risk-adjusted target — lower loan rate or longer hold improves spread."
+                )
+        if fix_tips:
+            with st.expander("🛠️ How Can You Turn This Deal Into a GO? (Actionable Fixes)", expanded=(verdict.status == "NO-GO")):
+                for tip in fix_tips:
+                    st.markdown(f"- {tip}")
 
     st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
 
@@ -1080,6 +1205,12 @@ with tab1:
     with wf_col1:
         waterfall_fig = create_acquisition_waterfall_chart(base_res.acquisition)
         st.plotly_chart(waterfall_fig, width="stretch")
+        extra_closing = base_res.acquisition.all_in_acquisition_cost - base_res.acquisition.agreement_value_inr
+        extra_pct = (extra_closing / base_res.acquisition.agreement_value_inr * 100.0) if base_res.acquisition.agreement_value_inr > 0 else 0.0
+        st.caption(
+            f"💡 **Takeaway:** Stamp duty, registration, GST, and fees add **+{format_inr(extra_closing)} (+{extra_pct:.1f}%)** "
+            f"above the {format_inr(base_res.acquisition.agreement_value_inr)} seller price. (1% TDS is deducted from the seller, not added to your cost.)"
+        )
 
     with wf_col2:
         st.markdown("#### 📋 Statutory Checklist")
@@ -1122,11 +1253,18 @@ with tab1:
 # TAB 2: CASH FLOW, AMORTIZATION & TAX ENGINE
 # ---------------------------------------------------------
 with tab2:
-    st.markdown("### 📅 Year-by-Year Cash Flow & Amortization Engine")
-    st.caption("Detailed schedule covering operating performance, debt service, tax shelter, and equity accumulation.")
+    st.markdown("### 📅 Year-by-Year Cash Flow & Loan Schedule")
+    st.caption("Plain-English yearly summary of rent, EMI, taxes, your monthly pocket impact, and realizable profit if sold.")
 
-    # Convert cash flows to DataFrame
+    show_full_accounting = st.checkbox(
+        "Show Full 12-Column Institutional Accounting Schedule",
+        value=is_pro_mode,
+        help="Switch between a simple 6-column buyer summary and the full institutional operating/amortization ledger.",
+    )
+
+    # Full 12-column DataFrame (used for CSV download and Pro View)
     cf_records = []
+    compact_records = []
     for row in base_res.annual_cash_flows:
         cf_records.append({
             "Year": f"Yr {row.year}",
@@ -1142,15 +1280,26 @@ with tab2:
             "Closing Loan Balance": row.remaining_loan_balance,
             "Net Equity": row.net_equity,
         })
+        tax_label_val = -row.tax_impact  # positive = tax saved, negative = tax paid
+        compact_records.append({
+            "Year": f"Yr {row.year}",
+            "Rent Collected": format_inr(row.egi, precision=2),
+            "Total EMI Paid": format_inr(row.annual_emi, precision=2),
+            "Tax Saved / (Paid)": format_inr(tax_label_val, precision=2),
+            "Pocket Impact (Yearly)": format_inr(row.net_cash_flow, precision=2),
+            "Pocket Impact (Monthly)": f"{format_inr(row.net_cash_flow / 12.0, precision=1)}/mo",
+            "Cash In Hand If Sold": format_inr(row.net_realizable_equity, precision=2),
+        })
     cf_df = pd.DataFrame(cf_records)
 
-    # Display table formatted in INR
-    display_df = cf_df.copy()
-    for col in display_df.columns:
-        if col != "Year":
-            display_df[col] = display_df[col].apply(lambda x: format_inr(x, precision=2))
-
-    st.dataframe(display_df, width="stretch", hide_index=True)
+    if show_full_accounting:
+        display_df = cf_df.copy()
+        for col in display_df.columns:
+            if col != "Year":
+                display_df[col] = display_df[col].apply(lambda x: format_inr(x, precision=2))
+        st.dataframe(display_df, width="stretch", hide_index=True)
+    else:
+        st.dataframe(pd.DataFrame(compact_records), width="stretch", hide_index=True)
 
     # Download CSV button
     csv_bytes = cf_df.to_csv(index=False).encode("utf-8")
@@ -1168,10 +1317,24 @@ with tab2:
     with cf_chart_col:
         cf_fig = create_cash_flow_trajectory_chart(base_res.annual_cash_flows)
         st.plotly_chart(cf_fig, width="stretch")
+        pos_yr = next((cf.year for cf in base_res.annual_cash_flows if cf.net_cash_flow >= 0), None)
+        tot_drain = sum(min(0.0, cf.net_cash_flow) for cf in base_res.annual_cash_flows)
+        be_msg = (
+            f"Cash flow turns positive in **Year {pos_yr}** (rent catches up to EMI)."
+            if pos_yr is not None
+            else f"Rent stays below EMI across all {holding_period} yrs (total top-up: **{format_inr(abs(tot_drain))}**)."
+        )
+        st.caption(f"💡 **Takeaway:** Year-1 pocket impact is **{format_inr(y1_monthly_cf)}/mo**. {be_msg}")
 
     with amort_chart_col:
         amort_fig = create_amortization_chart(base_res.loan.annual_schedule)
         st.plotly_chart(amort_fig, width="stretch")
+        tot_int = sum(cf.interest_paid for cf in base_res.annual_cash_flows)
+        tot_prin = sum(cf.principal_paid for cf in base_res.annual_cash_flows)
+        st.caption(
+            f"💡 **Takeaway:** Over {holding_period} yrs, you pay **{format_inr(tot_int)}** in bank interest and "
+            f"repay **{format_inr(tot_prin)}** of loan principal (remaining loan at exit: **{format_inr(base_res.loan.remaining_loan_balance_H)}**)."
+        )
 
     # Glass-box calculation proof & decision audit
     render_tab2_explainer(
@@ -1226,6 +1389,17 @@ with tab3:
     # Wealth Trajectory Chart
     wealth_fig = create_wealth_trajectory_chart(matrix, financing_obj.holding_period_years)
     st.plotly_chart(wealth_fig, width="stretch")
+    re_end = base_res.exit.net_exit_proceeds
+    fd_end = base_res.fd_benchmark.terminal_wealth_post_tax
+    nifty_end = base_res.nifty_benchmark.terminal_wealth_post_tax
+    winner_name, winner_val = max(
+        [("Real Estate (Base)", re_end), ("SBI FD", fd_end), ("Nifty 50 TRI", nifty_end)],
+        key=lambda x: x[1],
+    )
+    st.caption(
+        f"💡 **Takeaway:** At Year {holding_period}, **{winner_name}** finishes highest at **{format_inr(winner_val)}** in hand "
+        f"(Real Estate: **{format_inr(re_end)}** · SBI FD: **{format_inr(fd_end)}** · Nifty 50: **{format_inr(nifty_end)}**)."
+    )
 
     # Opportunity Cost Summary Box
     fd_adv = base_res.fd_benchmark.net_wealth_advantage_inr
@@ -1355,6 +1529,15 @@ with tab4:
 
     scatter_fig = create_micromarket_scatter_chart(merged_df, sel_pincode, selected_bhk)
     st.plotly_chart(scatter_fig, width="stretch")
+    mkt_rr_cur = (
+        base_res.acquisition.agreement_value_inr / base_res.acquisition.rr_market_value
+        if base_res.acquisition.rr_market_value > 0
+        else 1.0
+    )
+    st.caption(
+        f"💡 **How to Read This:** Top-left is best (higher rental yield at a lower markup over Govt Ready Reckoner). "
+        f"**{sel_loc_name}** sits at **{base_res.year_1_gross_yield_pct:.2f}%** gross yield and **{mkt_rr_cur:.2f}×** Govt RR."
+    )
 
     st.markdown("---")
 
@@ -1446,10 +1629,12 @@ with tab5:
     st.markdown("### 🔀 Value Drivers — Relative Impact")
     tornado_items = compute_tornado_data(property_obj, financing_obj, investor_obj, macro)
     st.plotly_chart(create_tornado_chart(tornado_items), width="stretch")
-    st.caption(
-        "The wider a bar, the more that single assumption moves your equity IRR. "
-        "Focus your diligence on the widest bars."
-    )
+    if tornado_items:
+        top_drv = tornado_items[0]
+        st.caption(
+            f"💡 **Takeaway:** Your **#1 profit driver is {top_drv['label']}**, which swings your annual return from "
+            f"**{top_drv['low']:.2f}%** (downside) to **{top_drv['high']:.2f}%** (upside)."
+        )
 
     st.markdown("---")
 
@@ -1459,7 +1644,14 @@ with tab5:
         property_obj, financing_obj, investor_obj, macro
     )
     st.plotly_chart(
-        create_sensitivity_heatmap(appr_axis, esc_axis, irr_grid), width="stretch"
+        create_sensitivity_heatmap(
+            appr_axis,
+            esc_axis,
+            irr_grid,
+            current_appr_pct=property_obj.appreciation_rate * 100.0,
+            current_esc_pct=financing_obj.annual_rent_escalation_pct * 100.0,
+        ),
+        width="stretch",
     )
     st.caption(
         "Find your locality's expected appreciation on the vertical axis and your "
@@ -1536,6 +1728,11 @@ with tab5:
         )
 
     st.plotly_chart(create_expected_value_chart(ev), width="stretch")
+    ev_irr_cap = f"{ev.expected_equity_irr_pct:.2f}%/yr" if ev.expected_equity_irr_pct is not None else "N/A"
+    st.caption(
+        f"💡 **Takeaway:** Weighting Best ({p_best}%), Base ({p_base}%), and Worst ({p_worst}%) outcomes gives an expected return of "
+        f"**{ev_irr_cap}** and **{format_inr(ev.expected_terminal_wealth)}** in hand."
+    )
 
     st.markdown("---")
 

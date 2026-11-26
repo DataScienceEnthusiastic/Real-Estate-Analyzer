@@ -32,6 +32,38 @@ def format_inr(value: float, precision: int = 2) -> str:
         return f"{sign}₹{abs_val:.{precision}f}"
 
 
+def _apply_inr_yaxis(fig: go.Figure, values: list[float], n_ticks: int = 6) -> None:
+    """Sets clean Indian Rupee (₹L / ₹Cr) tick labels on the primary Y-axis."""
+    finite = [float(v) for v in values if v is not None and not (np.isnan(v) or np.isinf(v))]
+    if not finite:
+        return
+    lo, hi = min(0.0, min(finite)), max(0.0, max(finite))
+    if abs(hi - lo) < 1_000.0:
+        return
+    tick_vals = np.linspace(lo, hi, n_ticks)
+    fig.update_yaxes(
+        tickmode="array",
+        tickvals=tick_vals.tolist(),
+        ticktext=[format_inr(v, precision=1) for v in tick_vals],
+    )
+
+
+def _apply_inr_xaxis(fig: go.Figure, values: list[float], n_ticks: int = 5) -> None:
+    """Sets clean Indian Rupee (₹L / ₹Cr) tick labels on the X-axis."""
+    finite = [float(v) for v in values if v is not None and not (np.isnan(v) or np.isinf(v))]
+    if not finite:
+        return
+    lo, hi = min(0.0, min(finite)), max(0.0, max(finite))
+    if abs(hi - lo) < 1_000.0:
+        return
+    tick_vals = np.linspace(lo, hi * 1.15, n_ticks)
+    fig.update_xaxes(
+        tickmode="array",
+        tickvals=tick_vals.tolist(),
+        ticktext=[format_inr(v, precision=1) for v in tick_vals],
+    )
+
+
 def create_acquisition_waterfall_chart(acquisition: AcquisitionCostBreakdown) -> go.Figure:
     """Generates an executive waterfall chart for statutory and all-in property acquisition costs."""
     labels = ["Agreement Value", "Stamp Duty", "Registration Fee"]
@@ -95,6 +127,7 @@ def create_acquisition_waterfall_chart(acquisition: AcquisitionCostBreakdown) ->
         hoverlabel={"bgcolor": "#1e293b", "font": {"color": "#ffffff", "family": "Inter, system-ui, sans-serif"}},
         height=380,
     )
+    _apply_inr_yaxis(fig, values)
     return fig
 
 
@@ -111,6 +144,7 @@ def create_cash_flow_trajectory_chart(annual_cfs: list[CashFlowYear]) -> go.Figu
 
     colors = ["#34d399" if cf >= 0 else "#f43f5e" for cf in cfs]
     text_cfs = [format_inr(cf) for cf in cfs]
+    monthly_cfs = [format_inr(cf / 12.0) for cf in cfs]
 
     fig = go.Figure()
 
@@ -119,12 +153,13 @@ def create_cash_flow_trajectory_chart(annual_cfs: list[CashFlowYear]) -> go.Figu
         go.Bar(
             x=years,
             y=cfs,
-            name="Annual Net Cash Flow",
+            name="Yearly Pocket Surplus / Deficit",
             marker_color=colors,
             text=text_cfs,
+            customdata=monthly_cfs,
             textposition="auto",
             textfont={"color": "#ffffff", "size": 11, "family": "Inter, system-ui, sans-serif"},
-            hovertemplate="<b>%{x} Net Cash Flow</b>: %{text}<extra></extra>",
+            hovertemplate="<b>%{x} Cash Flow</b>: %{text} (<b>%{customdata}/mo</b>)<extra></extra>",
         )
     )
 
@@ -133,7 +168,7 @@ def create_cash_flow_trajectory_chart(annual_cfs: list[CashFlowYear]) -> go.Figu
         go.Scatter(
             x=years,
             y=cumulative_drain,
-            name="Cumulative Cash Flow",
+            name="Cumulative Cash Put In / Out",
             mode="lines+markers",
             line={"color": "#818cf8", "width": 3},
             marker={"size": 7, "color": "#a5b4fc"},
@@ -141,11 +176,25 @@ def create_cash_flow_trajectory_chart(annual_cfs: list[CashFlowYear]) -> go.Figu
         )
     )
 
+    # Mark first year where property turns cash-flow positive
+    breakeven_idx = next((idx for idx, cf in enumerate(cfs) if cf >= 0.0), None)
+    if breakeven_idx is not None:
+        fig.add_vline(x=breakeven_idx, line_dash="dash", line_color="#34d399", line_width=1.5)
+        fig.add_annotation(
+            x=years[breakeven_idx],
+            y=1.0,
+            yref="paper",
+            text=f"✓ Rent Covers EMI (Yr {annual_cfs[breakeven_idx].year})",
+            showarrow=False,
+            yshift=10,
+            font={"size": 10.5, "color": "#34d399", "family": "Inter, system-ui, sans-serif"},
+        )
+
     fig.update_layout(
         title={"text": "<b>Operating Cash Flow & Cumulative Trajectory</b>", "font": {"size": 16, "color": "#f8fafc"}},
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
-        margin={"l": 30, "r": 30, "t": 50, "b": 30},
+        margin={"l": 30, "r": 30, "t": 60, "b": 30},
         yaxis={
             "title": "INR",
             "tickformat": ",.0f",
@@ -167,6 +216,7 @@ def create_cash_flow_trajectory_chart(annual_cfs: list[CashFlowYear]) -> go.Figu
         hoverlabel={"bgcolor": "#1e293b", "font": {"color": "#ffffff", "family": "Inter, system-ui, sans-serif"}},
         height=360,
     )
+    _apply_inr_yaxis(fig, cfs + cumulative_drain)
     return fig
 
 
@@ -211,12 +261,26 @@ def create_amortization_chart(annual_sched: list[dict[str, float]]) -> go.Figure
         )
     )
 
+    # Mark year when principal repayment exceeds interest paid
+    crossover_idx = next((idx for idx, row in enumerate(annual_sched) if row["principal_paid"] > row["interest_paid"] and row["principal_paid"] > 0), None)
+    if crossover_idx is not None:
+        fig.add_vline(x=crossover_idx, line_dash="dash", line_color="#38bdf8", line_width=1.5)
+        fig.add_annotation(
+            x=years[crossover_idx],
+            y=1.0,
+            yref="paper",
+            text=f"★ Principal > Interest (Yr {annual_sched[crossover_idx]['year']})",
+            showarrow=False,
+            yshift=10,
+            font={"size": 10.5, "color": "#38bdf8", "family": "Inter, system-ui, sans-serif"},
+        )
+
     fig.update_layout(
         title={"text": "<b>Loan Amortization & Principal Reduction</b>", "font": {"size": 16, "color": "#f8fafc"}},
         barmode="stack",
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
-        margin={"l": 30, "r": 40, "t": 50, "b": 30},
+        margin={"l": 30, "r": 40, "t": 60, "b": 30},
         yaxis={
             "title": "Annual Outflow (INR)",
             "tickformat": ",.0f",
@@ -247,6 +311,7 @@ def create_amortization_chart(annual_sched: list[dict[str, float]]) -> go.Figure
         hoverlabel={"bgcolor": "#1e293b", "font": {"color": "#ffffff", "family": "Inter, system-ui, sans-serif"}},
         height=360,
     )
+    _apply_inr_yaxis(fig, [p + i for p, i in zip(principal, interest)])
     return fig
 
 
@@ -326,11 +391,27 @@ def create_wealth_trajectory_chart(matrix: ScenarioMatrixResult, holding_period_
         )
     )
 
+    # End-of-line value badges at Year H
+    end_points = [
+        (re_equity[-1], f"RE Base: {format_inr(re_equity[-1])}", "#34d399"),
+        (fd_wealth[-1], f"SBI FD: {format_inr(fd_wealth[-1])}", "#fbbf24"),
+        (nifty_wealth[-1], f"Nifty: {format_inr(nifty_wealth[-1])}", "#818cf8"),
+    ]
+    for val, lbl, col in end_points:
+        fig.add_annotation(
+            x=years[-1],
+            y=val,
+            text=f" {lbl}",
+            showarrow=False,
+            xanchor="left",
+            font={"size": 10.5, "color": col, "family": "Inter, system-ui, sans-serif"},
+        )
+
     fig.update_layout(
         title={"text": "<b>Wealth Creation Trajectory: Real Estate vs Liquid Benchmarks</b>", "font": {"size": 16, "color": "#f8fafc"}},
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
-        margin={"l": 30, "r": 30, "t": 50, "b": 30},
+        margin={"l": 30, "r": 125, "t": 50, "b": 30},
         yaxis={
             "title": "Net Wealth (INR)",
             "tickformat": ",.0f",
@@ -352,6 +433,7 @@ def create_wealth_trajectory_chart(matrix: ScenarioMatrixResult, holding_period_
         hoverlabel={"bgcolor": "#1e293b", "font": {"color": "#ffffff", "family": "Inter, system-ui, sans-serif"}},
         height=420,
     )
+    _apply_inr_yaxis(fig, list(re_equity) + list(fd_wealth) + list(nifty_wealth) + list(worst_equity))
     return fig
 
 
@@ -403,6 +485,29 @@ def create_micromarket_scatter_chart(
             "North_PCMC": "#fb7185",
         },
     )
+
+    # 4 Quadrant Reference Lines & Plain-English Labels
+    med_price = float(plot_df["price_per_sqft_carpet_equiv"].median())
+    med_yield = float(plot_df["implied_gross_rental_yield_pct"].median())
+    fig.add_vline(x=med_price, line_dash="dot", line_color="#475569", line_width=1.2)
+    fig.add_hline(y=med_yield, line_dash="dot", line_color="#475569", line_width=1.2)
+
+    x_min, x_max = float(plot_df["price_per_sqft_carpet_equiv"].min()), float(plot_df["price_per_sqft_carpet_equiv"].max())
+    y_min, y_max = float(plot_df["implied_gross_rental_yield_pct"].min()), float(plot_df["implied_gross_rental_yield_pct"].max())
+    quadrants = [
+        (x_min, y_max, "💎 SWEET SPOT (High Yield + Fair Price)", "#34d399", "left", "top"),
+        (x_max, y_max, "🏢 High Yield, Premium Price", "#38bdf8", "right", "top"),
+        (x_min, y_min, "🏠 Affordable, Lower Rent", "#fbbf24", "left", "bottom"),
+        (x_max, y_min, "⚠️ Expensive & Low Yield", "#f87171", "right", "bottom"),
+    ]
+    for qx, qy, qtxt, qcol, xanc, yanc in quadrants:
+        fig.add_annotation(
+            x=qx, y=qy, text=qtxt, showarrow=False,
+            xanchor=xanc, yanchor=yanc,
+            font={"size": 10.5, "color": qcol, "family": "Inter, system-ui, sans-serif"},
+            bgcolor="rgba(11, 15, 25, 0.65)",
+            borderpad=3,
+        )
 
     # Highlight currently selected unit
     pincode_clean = str(selected_pincode).strip().zfill(6)
@@ -473,6 +578,8 @@ def create_sensitivity_heatmap(
     appr_vals_pct: np.ndarray,
     esc_vals_pct: np.ndarray,
     irr_matrix: np.ndarray,
+    current_appr_pct: Optional[float] = None,
+    current_esc_pct: Optional[float] = None,
 ) -> go.Figure:
     """Heat-map of equity IRR across appreciation × rent escalation."""
     zmin = float(np.nanmin(irr_matrix)) if not np.all(np.isnan(irr_matrix)) else 0.0
@@ -505,6 +612,20 @@ def create_sensitivity_heatmap(
             hovertemplate="Appreciation %{y:.1f}% · Rent esc. %{x:.1f}%<br>IRR: <b>%{z:.2f}%</b><extra></extra>",
         )
     )
+    if current_appr_pct is not None and current_esc_pct is not None:
+        fig.add_trace(
+            go.Scatter(
+                x=[current_esc_pct],
+                y=[current_appr_pct],
+                mode="markers+text",
+                text=["★ YOU ARE HERE"],
+                textposition="top center",
+                textfont={"size": 11, "color": "#ffffff", "family": "Inter, system-ui, sans-serif"},
+                marker={"size": 16, "color": "#facc15", "symbol": "star", "line": {"color": "#0f172a", "width": 2}},
+                showlegend=False,
+                hovertemplate=f"<b>Your Current Deal</b><br>Appreciation: {current_appr_pct:.2f}%<br>Rent Growth: {current_esc_pct:.1f}%<extra></extra>",
+            )
+        )
     fig.update_layout(
         title={"text": "<b>Equity IRR Sensitivity: Appreciation × Rent Escalation</b>",
                "font": {"size": 16, "color": "#f8fafc"}},
@@ -581,7 +702,7 @@ def create_tornado_chart(items: list[dict]) -> go.Figure:
 
 def create_expected_value_chart(ev) -> go.Figure:
     """Bar chart of terminal wealth across Best / Base / Worst / Expected."""
-    labels = ["Worst case", "Base case", "Best case", "★ Expected value"]
+    labels = ["Bad Market (Worst)", "Realistic Base", "Optimistic (Best)", "★ Probability-Weighted Avg"]
     values = [
         ev.worst_terminal_wealth,
         ev.base_terminal_wealth,
@@ -606,7 +727,7 @@ def create_expected_value_chart(ev) -> go.Figure:
                "font": {"size": 16, "color": "#f8fafc"}},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        margin={"l": 10, "r": 40, "t": 50, "b": 30},
+        margin={"l": 10, "r": 70, "t": 50, "b": 30},
         xaxis={
             "title": "Net Terminal Wealth (INR)",
             "tickformat": ",.0f",
@@ -620,6 +741,7 @@ def create_expected_value_chart(ev) -> go.Figure:
         hoverlabel={"bgcolor": "#1e293b", "font": {"color": "#ffffff", "family": "Inter, system-ui, sans-serif"}},
         height=280,
     )
+    _apply_inr_xaxis(fig, values)
     return fig
 
 
