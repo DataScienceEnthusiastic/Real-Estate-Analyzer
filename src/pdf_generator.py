@@ -11,7 +11,7 @@ import io
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import numpy as np
 import plotly.graph_objects as go
@@ -50,6 +50,16 @@ from src.charts import (
     prepare_fig_for_pdf,
 )
 from src.data_loader import get_merged_dataset
+from src.pdf_charts_fallback import (
+    render_amortization_png,
+    render_cash_flow_png,
+    render_expected_value_png,
+    render_heatmap_png,
+    render_scatter_png,
+    render_tornado_png,
+    render_waterfall_png,
+    render_wealth_trajectory_png,
+)
 from src.models import (
     FinancingInput,
     InvestorProfile,
@@ -82,6 +92,7 @@ _inr = fmt_inr_pdf
 
 
 _logger = logging.getLogger(__name__)
+_KALEIDO_WORKING: Optional[bool] = None
 
 
 def _render_plotly_png(fig_pdf: go.Figure, scale: float) -> bytes:
@@ -94,20 +105,33 @@ def _fig_to_reportlab_image(
     width: float,
     height: float,
     scale: float = 2.0,
+    fallback_fn: Optional[Callable[[], bytes]] = None,
 ) -> Optional[Image]:
-    """Converts a Plotly Figure into a ReportLab Image Flowable with executive dark styling and unclipped margins."""
-    try:
-        fig_pdf = prepare_fig_for_pdf(fig)
+    """Converts a Plotly Figure into a ReportLab Image Flowable, falling back to Matplotlib if Kaleido/Chrome is unavailable."""
+    global _KALEIDO_WORKING
+
+    if _KALEIDO_WORKING is not False:
         try:
-            img_bytes = _render_plotly_png(fig_pdf, scale)
-        except Exception as first_err:
-            _logger.warning("Primary Kaleido render failed (%s); retrying in isolated thread.", first_err)
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                img_bytes = pool.submit(_render_plotly_png, fig_pdf, scale).result(timeout=45)
-        return Image(io.BytesIO(img_bytes), width=width, height=height)
-    except Exception as exc:
-        _logger.warning("Failed to embed chart in PDF: %s", exc)
-        return None
+            fig_pdf = prepare_fig_for_pdf(fig)
+            try:
+                img_bytes = _render_plotly_png(fig_pdf, scale)
+            except Exception:
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    img_bytes = pool.submit(_render_plotly_png, fig_pdf, scale).result(timeout=30)
+            _KALEIDO_WORKING = True
+            return Image(io.BytesIO(img_bytes), width=width, height=height)
+        except Exception as exc:
+            _KALEIDO_WORKING = False
+            _logger.warning("Kaleido/Chromium unavailable (%s); using pure-Python Matplotlib fallback.", exc)
+
+    if fallback_fn is not None:
+        try:
+            fb_bytes = fallback_fn()
+            return Image(io.BytesIO(fb_bytes), width=width, height=height)
+        except Exception as fb_exc:
+            _logger.warning("Matplotlib fallback failed for PDF chart: %s", fb_exc)
+
+    return None
 
 
 def generate_underwriting_pdf(
@@ -592,6 +616,7 @@ def generate_underwriting_pdf(
         create_acquisition_waterfall_chart(acq),
         width=523,
         height=210,
+        fallback_fn=lambda: render_waterfall_png(acq),
     )
     if im_waterfall:
         story.append(im_waterfall)
@@ -653,11 +678,13 @@ def generate_underwriting_pdf(
         create_cash_flow_trajectory_chart(base_res.annual_cash_flows),
         width=255,
         height=180,
+        fallback_fn=lambda: render_cash_flow_png(base_res.annual_cash_flows),
     )
     im_amort = _fig_to_reportlab_image(
         create_amortization_chart(base_res.loan.annual_schedule),
         width=255,
         height=180,
+        fallback_fn=lambda: render_amortization_png(base_res.loan.annual_schedule),
     )
     if im_cf and im_amort:
         t_cf_amort = Table([[im_cf, im_amort]], colWidths=[261.5, 261.5])
@@ -765,6 +792,7 @@ def generate_underwriting_pdf(
         create_wealth_trajectory_chart(matrix, h),
         width=523,
         height=185,
+        fallback_fn=lambda: render_wealth_trajectory_png(matrix, h),
     )
     if im_wealth:
         story.append(im_wealth)
@@ -1009,6 +1037,7 @@ def generate_underwriting_pdf(
         create_tornado_chart(tornado_items),
         width=255,
         height=165,
+        fallback_fn=lambda: render_tornado_png(tornado_items),
     )
     appr_axis, esc_axis, irr_grid = compute_sensitivity_grid(property_obj, financing_obj, investor_obj, macro)
     im_heatmap = _fig_to_reportlab_image(
@@ -1021,6 +1050,13 @@ def generate_underwriting_pdf(
         ),
         width=255,
         height=165,
+        fallback_fn=lambda: render_heatmap_png(
+            appr_axis,
+            esc_axis,
+            irr_grid,
+            current_appr_pct=property_obj.appreciation_rate * 100.0,
+            current_esc_pct=financing_obj.annual_rent_escalation_pct * 100.0,
+        ),
     )
     if im_tornado and im_heatmap:
         t_vis_sens = Table([[im_tornado, im_heatmap]], colWidths=[261.5, 261.5])
@@ -1039,6 +1075,7 @@ def generate_underwriting_pdf(
         create_expected_value_chart(ev),
         width=523,
         height=150,
+        fallback_fn=lambda: render_expected_value_png(ev),
     )
     if im_ev:
         story.append(im_ev)
@@ -1051,6 +1088,7 @@ def generate_underwriting_pdf(
             create_micromarket_scatter_chart(merged_df, property_obj.pincode, property_obj.bhk),
             width=523,
             height=220,
+            fallback_fn=lambda: render_scatter_png(merged_df, property_obj.pincode, property_obj.bhk),
         )
         if im_scatter:
             story.append(
