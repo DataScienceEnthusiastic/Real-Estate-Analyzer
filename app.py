@@ -103,7 +103,7 @@ st.markdown(
             margin-bottom: 20px;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
         }
-        /* Strict geometric sizing for metric cards: identical height & flexbox baseline */
+        /* Strict geometric sizing for metric cards: flexible on mobile, uniform on desktop */
         .metric-card {
             background-color: #111827;
             border: 1px solid #1f2937;
@@ -113,7 +113,7 @@ st.markdown(
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
             text-align: left;
             min-height: 120px;
-            height: 120px;
+            height: auto;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -137,6 +137,7 @@ st.markdown(
             font-weight: 800;
             color: #ffffff;
             line-height: 1.2;
+            word-break: break-word;
         }
         .metric-sub {
             font-size: 0.80rem;
@@ -153,7 +154,7 @@ st.markdown(
             border-radius: 10px;
             padding: 20px;
             min-height: 345px;
-            height: 345px;
+            height: auto;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -167,12 +168,13 @@ st.markdown(
             border-radius: 10px;
             padding: 18px 20px;
             min-height: 310px;
-            height: 310px;
+            height: auto;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             box-sizing: border-box;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            margin-bottom: 14px;
         }
         .statutory-card {
             background: #111827;
@@ -182,11 +184,12 @@ st.markdown(
             padding: 18px 20px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
             min-height: 380px;
-            height: 380px;
+            height: auto;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             box-sizing: border-box;
+            margin-bottom: 14px;
         }
         .opp-cost-card {
             background: #111827;
@@ -237,6 +240,7 @@ st.markdown(
             font-size: 0.76rem;
             font-weight: 600;
             margin-right: 6px;
+            margin-bottom: 4px;
             letter-spacing: 0.02em;
         }
         .badge-green { background-color: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.4); }
@@ -273,15 +277,21 @@ st.markdown(
         .stTabs [data-baseweb="tab-list"] {
             gap: 8px;
             background-color: transparent;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            scrollbar-width: thin;
+            -webkit-overflow-scrolling: touch;
         }
         .stTabs [data-baseweb="tab"] {
             height: 44px;
-            padding: 0 18px;
+            padding: 0 16px;
             border-radius: 8px;
             font-weight: 600;
             color: #94a3b8;
             background-color: #111827;
             border: 1px solid #1f2937;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
         .stTabs [aria-selected="true"] {
             background-color: #1e293b !important;
@@ -292,6 +302,70 @@ st.markdown(
             background-color: #111827;
             border: 1px solid #1f2937;
             border-radius: 10px;
+        }
+
+        /* 📱 Mobile & Tablet Responsive Adaptations */
+        @media (max-width: 768px) {
+            .block-container {
+                padding-top: 2.2rem !important;
+                padding-left: 0.8rem !important;
+                padding-right: 0.8rem !important;
+                max-width: 100% !important;
+            }
+            .hero-banner {
+                padding: 16px 14px;
+                border-radius: 10px;
+            }
+            .hero-banner h1 {
+                font-size: 1.5rem !important;
+                line-height: 1.3 !important;
+            }
+            .hero-banner h1 span {
+                display: block;
+                font-size: 1.05rem !important;
+                margin-top: 4px;
+            }
+            .verdict-box {
+                min-width: 100% !important;
+                width: 100% !important;
+                padding: 10px 16px !important;
+                box-sizing: border-box !important;
+            }
+            .metric-card {
+                padding: 12px 14px;
+                margin-bottom: 10px;
+                min-height: auto;
+            }
+            .metric-value {
+                font-size: 1.35rem;
+            }
+            .scenario-card, .stress-card, .statutory-card {
+                min-height: auto;
+                height: auto;
+                padding: 14px;
+                margin-bottom: 12px;
+            }
+            .opp-cost-card {
+                padding: 14px 16px;
+            }
+            .opp-cost-card > div {
+                gap: 16px !important;
+            }
+            .stTabs [data-baseweb="tab"] {
+                padding: 0 12px;
+                font-size: 0.82rem;
+                height: 40px;
+            }
+            /* Ensure Plotly charts stay responsive and fit mobile screens */
+            .js-plotly-plot, .plotly {
+                max-width: 100% !important;
+                overflow-x: auto !important;
+            }
+            /* Stack columns on small viewports gracefully */
+            [data-testid="column"] {
+                min-width: 100% !important;
+                margin-bottom: 10px;
+            }
         }
     </style>
     """,
