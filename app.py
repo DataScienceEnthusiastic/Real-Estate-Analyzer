@@ -334,19 +334,19 @@ loc_df = get_cached_loc_df()
 # SIDEBAR: 4-TIER HIERARCHICAL INPUTS
 # ---------------------------------------------------------
 with st.sidebar:
-    st.markdown("### 🏢 Pune Deal Underwriter")
-    st.caption("Quantitative Decision Support Engine")
+    st.markdown("### 🏢 Pune Home-Buying Advisor")
+    st.caption("Easy Home-Buying & Investment Check")
     view_mode = st.radio(
-        "Experience Mode",
+        "View Mode",
         ["Simple Buyer Mode", "Pro Analyst Mode"],
         index=0,
         horizontal=True,
-        help="Simple Mode highlights plain-English answers and compact tables. Pro Mode unlocks full 12-column accounting schedules and live mathematical proofs.",
+        help="Simple Mode highlights plain-English answers and compact tables. Pro Mode unlocks full 12-column accounting schedules and detailed formulas.",
     )
     is_pro_mode = view_mode == "Pro Analyst Mode"
 
     # Tier 1: Property Selection & Market Lookup
-    st.markdown("#### 1. Micro-Market & Configuration")
+    st.markdown("#### 1. Location & Flat Size")
     zone_options = ["All Zones"] + zones
     selected_zone_filter = st.selectbox("Zone Filter", zone_options, index=0)
 
@@ -370,7 +370,7 @@ with st.sidebar:
     sel_loc_name = selected_loc_record["locality_name"]
 
     bhk_options = ["1_BHK", "2_BHK", "3_BHK", "4_PLUS_BHK"]
-    selected_bhk = st.selectbox("Configuration", bhk_options, index=1)
+    selected_bhk = st.selectbox("Flat Size (BHK)", bhk_options, index=1)
 
     # Look up benchmark defaults
     defaults = get_property_market_defaults(sel_pincode, sel_loc_name, selected_bhk)
@@ -381,8 +381,8 @@ with st.sidebar:
         <div style="margin-bottom: 12px;">
             <span class="badge badge-slate">Zone: {defaults.pune_zone}</span>
             <span class="badge badge-slate">Govt: {defaults.jurisdiction}</span>
-            <span class="badge badge-slate">Liquidity: {defaults.liquidity_tier.upper()}</span><br>
-            <span class="badge badge-slate" style="margin-top: 4px;">RR Rate: ₹{defaults.rr_rate_primary_sqft:,.0f}/sqft</span>
+            <span class="badge badge-slate">Resale Speed: {defaults.liquidity_tier.upper()}</span><br>
+            <span class="badge badge-slate" style="margin-top: 4px;">Govt Rate: ₹{defaults.rr_rate_primary_sqft:,.0f}/sqft</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -413,13 +413,13 @@ with st.sidebar:
 
     # Editable property overrides (bound to keys so switching localities always refreshes values)
     agreement_val_input = st.number_input(
-        "Agreement Value (INR)",
+        "Property Asking Price (INR)",
         min_value=500_000.0,
         max_value=250_000_000.0,
         step=50_000.0,
         format="%.0f",
         key="override_agreement",
-        help="Base purchase price agreed with developer/seller before statutory closing costs.",
+        help="Base property price agreed with builder/seller before stamp duty, registration, and GST.",
     )
 
     carpet_area_input = st.number_input(
@@ -459,7 +459,7 @@ with st.sidebar:
     st.markdown("---")
 
     # Tier 2: Purchase Purpose & Asset Branching
-    st.markdown("#### 2. Purpose & Legal Structuring")
+    st.markdown("#### 2. Buying Purpose & Ownership")
     use_case = st.selectbox(
         "Purchase Goal",
         ["investment_rental", "self_use"],
@@ -493,14 +493,14 @@ with st.sidebar:
 
     col_b1, col_b2 = st.columns(2)
     with col_b1:
-        buy_brokerage_enabled = st.checkbox("Buy Brokerage", value=(prop_status == "ready_resale"), help="1.5% + 18% GST")
+        buy_brokerage_enabled = st.checkbox("Broker Fee (Buying)", value=(prop_status == "ready_resale"), help="1.5% + 18% GST")
     with col_b2:
-        sell_brokerage_enabled = st.checkbox("Exit Brokerage", value=True, help="1.5% + 18% GST on exit")
+        sell_brokerage_enabled = st.checkbox("Broker Fee (Selling)", value=True, help="1.5% + 18% GST when you sell")
 
     st.markdown("---")
 
     # Tier 3: Investor Profile
-    st.markdown("#### 3. Investor Financial Profile")
+    st.markdown("#### 3. Your Income & Savings")
     net_income = st.number_input(
         "Monthly Take-Home Income (INR)",
         min_value=30_000.0,
@@ -535,15 +535,15 @@ with st.sidebar:
         help="Cash, FDs, mutual funds available for down payment and emergency reserves.",
     )
     upcoming_cash_need = st.number_input(
-        "Planned Non-Property Cash Need (INR)",
+        "Upcoming Cash Needed Soon (INR)",
         min_value=0.0,
         max_value=50_000_000.0,
         value=0.0,
         step=100_000.0,
         format="%.0f",
-        help="Large cash requirements in next 1-3 years (e.g. child education, wedding).",
+        help="Large cash needs in the next 1–3 years (e.g. child's education, wedding).",
     )
-    emergency_months_target = st.slider("Target Emergency Buffer (Months)", min_value=3, max_value=18, value=6, step=1)
+    emergency_months_target = st.slider("Emergency Cash Buffer (Months)", min_value=3, max_value=18, value=6, step=1)
 
     col_t1, col_t2 = st.columns(2)
     with col_t1:
@@ -562,7 +562,7 @@ with st.sidebar:
         )
 
     surcharge_rate = st.selectbox(
-        "Income Tax Surcharge Tier",
+        "Extra Tax Surcharge (High Income)",
         [0.0, 0.10, 0.15, 0.25],
         index=0,
         format_func=lambda x: (
@@ -578,10 +578,10 @@ with st.sidebar:
     st.markdown("---")
 
     # Tier 4: Financing & Horizon Assumptions (Expander)
-    with st.expander("⚙️ 4. Mortgage, Friction & Macro Assumptions", expanded=False):
+    with st.expander("⚙️ 4. Loan, Fees & Future Growth Settings", expanded=False):
         rbi_limit = compute_rbi_max_ltv(agreement_val_input, macro)
         desired_ltv = st.slider(
-            f"Desired LTV (RBI Cap: {int(rbi_limit * 100)}%)",
+            f"Loan % of Price (RBI Max: {int(rbi_limit * 100)}%)",
             min_value=0.0,
             max_value=rbi_limit,
             value=min(0.75, rbi_limit),
@@ -601,7 +601,7 @@ with st.sidebar:
         holding_period = st.slider("Holding Period (Years)", min_value=2, max_value=25, value=10, step=1)
 
         rent_escalation = st.number_input(
-            "Annual Rent Escalation (%)",
+            "Yearly Rent Increase (%)",
             min_value=0.0,
             max_value=15.0,
             value=5.0,
@@ -638,43 +638,43 @@ with st.sidebar:
         )
 
         cpi_inflation = st.number_input(
-            "CPI Inflation Rate (% / yr)",
+            "Cost of Living Inflation (% / yr)",
             min_value=2.0,
             max_value=12.0,
             value=5.5,
             step=0.25,
             format="%.2f",
-            help="Drives opex escalation and computes Real (inflation-adjusted) Equity IRR.",
+            help="Increases yearly maintenance/repair costs and calculates your true return after inflation.",
         ) / 100.0
 
         capex_reserve_pct = st.number_input(
-            "CapEx & Re-Letting Reserve (% of EGI)",
+            "Yearly Repair & Re-Renting Budget (% of Rent)",
             min_value=0.0,
             max_value=15.0,
             value=5.0 if use_case == "investment_rental" else 2.0,
             step=0.5,
             format="%.1f",
-            help="Annual reserve for periodic painting, major repairs, and tenant re-letting brokerage.",
+            help="Yearly savings kept aside for painting, major repairs, and finding new tenants.",
         ) / 100.0
 
         loan_motd_pct = st.number_input(
-            "Loan Processing & MOTD Franking (% of Loan)",
+            "Loan Processing & Mortgage Stamp Fee (% of Loan)",
             min_value=0.0,
             max_value=2.0,
             value=0.35,
             step=0.05,
             format="%.2f",
-            help="Maharashtra MOTD mortgage stamp duty (~0.3%) + bank legal/processing fees.",
+            help="Maharashtra mortgage stamp duty (~0.3%) + bank legal/processing fees.",
         ) / 100.0
 
         mean_revert_appr = st.checkbox(
-            "Normalize Appreciation After Yr 5 (→ 6.5%)",
+            "Slow Down Price Growth After Yr 5 (to 6.5%)",
             value=True,
-            help="Mitigates 3–5Y post-COVID boom extrapolation bias by reverting 75% of excess appreciation toward Pune's 6.5% long-run equilibrium over Years 6–10.",
+            help="Avoids assuming recent boom prices last forever by easing growth toward Pune's 6.5% long-term average in Years 6–10.",
         )
 
         nifty_benchmark = st.number_input(
-            "Nifty 50 TRI CAGR (%)",
+            "Stock Market (Nifty 50) Expected Return (% / yr)",
             min_value=6.0,
             max_value=20.0,
             value=float(macro["liquid_benchmark_nifty50_cagr_pct"] * 100.0),
@@ -789,10 +789,10 @@ with col_top_title:
         """
         <div style="padding: 2px 0 6px 0;">
             <div style="font-size:0.75rem; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.10em;">
-                🏢 Pune Residential Real Estate Financial Underwriter
+                🏢 Pune Home-Buying & Investment Advisor
             </div>
             <div style="font-size:1.24rem; font-weight:800; color:#ffffff; letter-spacing:-0.01em;">
-                Institutional Multi-Scenario Investment Memorandum
+                Complete Property Check & Comparison Report
             </div>
         </div>
         """,
@@ -812,19 +812,19 @@ with col_top_action:
         all_zone_recommendations=all_ranked,
     )
     st.download_button(
-        label="📄 Download Underwriting Report (PDF)",
+        label="📄 Download Full Report (PDF)",
         data=pdf_report_bytes,
         file_name=f"pune_underwriting_memorandum_{sel_loc_name}_{selected_bhk}.pdf",
         mime="application/pdf",
         width="stretch",
-        help="Export complete multi-page institutional PDF memorandum: Deal Parameters, Statutory Waterfall, Loan Amortization, Stress Tests, Audits, and All-Zones Top 3 Finder (when All Zones is active).",
+        help="Download the complete multi-page PDF report with total cost, loan schedule, stress tests, safety checks, and Top 3 areas.",
     )
 
 # ---------------------------------------------------------
 # SMART MICRO-MARKET FINDER (WHEN "ALL ZONES" IS SELECTED)
 # ---------------------------------------------------------
 if selected_zone_filter == "All Zones" and all_ranked:
-    with st.expander("🧭 Smart Micro-Market Finder: Top 3 Pune Pincodes Aligned With Your Profile & Profitability", expanded=True):
+    with st.expander("🧭 Best Area Finder: Top 3 Pune Areas That Fit Your Budget & Profit", expanded=True):
         st.caption(
             f"Automatically underwrote all 43 Pune pincodes for your {selected_bhk.replace('_', ' ')} ({use_case.replace('_', ' ')}) "
             f"profile — matching your ₹{liquid_savings/100_000:.1f}L liquid savings, ₹{net_income/1000:.0f}k/mo income, {tax_regime.upper()} tax regime, and {holding_period}y horizon."
@@ -858,12 +858,12 @@ if selected_zone_filter == "All Zones" and all_ranked:
                                     PIN: <b style="color:#cbd5e1;">{rec.pincode}</b> · {rec.pune_zone} Zone · {rec.jurisdiction}
                                 </div>
                                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; background:#0b0f19; border:1px solid #1f2937; border-radius:8px; padding:10px; margin-bottom:10px; font-size:0.82rem;">
-                                    <div><span style="color:#94a3b8;">Ticket:</span> <b style="color:#ffffff;">{format_inr(rec.ticket_price_inr)}</b></div>
+                                    <div><span style="color:#94a3b8;">Price:</span> <b style="color:#ffffff;">{format_inr(rec.ticket_price_inr)}</b></div>
                                     <div><span style="color:#94a3b8;">Upfront:</span> <b style="color:#ffffff;">{format_inr(rec.upfront_cash_inr)}</b></div>
-                                    <div><span style="color:#94a3b8;">Base IRR:</span> <b style="color:#34d399;">{rec_irr}</b> <span style="color:#64748b;">({rec_real_irr} real)</span></div>
+                                    <div><span style="color:#94a3b8;">Annual Return:</span> <b style="color:#34d399;">{rec_irr}</b> <span style="color:#64748b;">({rec_real_irr} real)</span></div>
                                     <div><span style="color:#94a3b8;">Net Profit:</span> <b style="color:{'#38bdf8' if rec.net_wealth_created_inr >= 0 else '#f87171'};">{format_inr(rec.net_wealth_created_inr)}</b></div>
-                                    <div><span style="color:#94a3b8;">Yr-1 CF/mo:</span> <b style="color:{'#34d399' if rec.year_1_monthly_cf_inr >= 0 else '#fbbf24'};">{format_inr(rec.year_1_monthly_cf_inr)}</b></div>
-                                    <div><span style="color:#94a3b8;">DSCR / RR:</span> <b style="color:#cbd5e1;">{rec_dscr} / {rec.market_to_rr_ratio:.2f}x</b></div>
+                                    <div><span style="color:#94a3b8;">Yr-1 Cash/mo:</span> <b style="color:{'#34d399' if rec.year_1_monthly_cf_inr >= 0 else '#fbbf24'};">{format_inr(rec.year_1_monthly_cf_inr)}</b></div>
+                                    <div><span style="color:#94a3b8;">Rent/EMI / Govt Rate:</span> <b style="color:#cbd5e1;">{rec_dscr} / {rec.market_to_rr_ratio:.2f}x</b></div>
                                 </div>
                                 <ul style="margin:0; padding-left:16px; font-size:0.78rem; color:#cbd5e1; line-height:1.42;">
                                     {''.join(f'<li style="margin-bottom:4px;">{r}</li>' for r in rec.alignment_reasons)}
@@ -892,15 +892,15 @@ if selected_zone_filter == "All Zones" and all_ranked:
                         "Zone": r.pune_zone,
                         "Score": f"{r.alignment_score:.1f}",
                         "Verdict": r.verdict_status,
-                        "Ticket Price": format_inr(r.ticket_price_inr),
+                        "Base Price": format_inr(r.ticket_price_inr),
                         "Upfront Cash": format_inr(r.upfront_cash_inr),
-                        "Base IRR": f"{r.base_irr_pct:.2f}%" if r.base_irr_pct is not None else "N/A",
-                        "Real IRR": f"{r.real_irr_pct:.2f}%" if r.real_irr_pct is not None else "N/A",
-                        "Net Wealth Created": format_inr(r.net_wealth_created_inr),
-                        "Net Yield": f"{r.net_yield_pct:.2f}%",
-                        "DSCR": f"{r.dscr:.2f}x" if r.dscr is not None else "N/A",
-                        "Mkt/RR": f"{r.market_to_rr_ratio:.2f}x",
-                        "Liquidity": f"{r.liquidity_tier.upper()} ({r.quarters_to_sell:.1f}Q)",
+                        "Annual Return": f"{r.base_irr_pct:.2f}%" if r.base_irr_pct is not None else "N/A",
+                        "After Inflation": f"{r.real_irr_pct:.2f}%" if r.real_irr_pct is not None else "N/A",
+                        "Net Profit": format_inr(r.net_wealth_created_inr),
+                        "Net Rent %": f"{r.net_yield_pct:.2f}%",
+                        "Rent / EMI": f"{r.dscr:.2f}x" if r.dscr is not None else "N/A",
+                        "Price vs Govt Rate": f"{r.market_to_rr_ratio:.2f}x",
+                        "Resale Speed": f"{r.liquidity_tier.upper()} ({r.quarters_to_sell:.1f}Q)",
                     }
                     for r in all_ranked
                 ])
@@ -1015,11 +1015,11 @@ st.markdown(
 # WORKSPACE TABS
 # ---------------------------------------------------------
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📊 Executive Summary & 4-Gate Audit",
-    "📈 Cash Flow, Amortization & Tax Engine",
-    "⚖️ Scenarios, Stress Tests & Opportunity Cost",
-    "🗺️ Pune Micro-Market Explorer & Comparables",
-    "🔬 Sensitivity, Break-Even & Expected Value",
+    "📊 Summary & 4 Safety Checks",
+    "📈 Yearly Cash Flow, Loan & Taxes",
+    "⚖️ Best/Worst Cases, Stress Tests & FD/Nifty",
+    "🗺️ Pune Area Explorer & Comparison",
+    "🔬 What-Ifs, Break-Even & Profit Range",
 ])
 
 # ---------------------------------------------------------
@@ -1349,16 +1349,16 @@ with tab2:
 # TAB 3: SCENARIOS, STRESS TESTS & OPPORTUNITY COST
 # ---------------------------------------------------------
 with tab3:
-    st.markdown("### ⚖️ Multi-Scenario Matrix & Liquid Opportunity Cost")
-    st.caption("Side-by-side analysis under Best, Base, and Worst (Stress) conditions against SBI Term Deposits and Nifty 50 TRI.")
+    st.markdown("### ⚖️ Best, Expected & Bad Market Scenarios vs. Bank FD / Stocks")
+    st.caption("Compare how your money does in a Good, Expected, and Bad market vs. keeping it in an SBI Bank FD or Nifty 50.")
 
     # Side-by-side scenario comparison table
     sc_col1, sc_col2, sc_col3 = st.columns(3)
 
     scenarios_meta = [
-        ("🌟 Best Case", matrix.best, "#059669", "Appreciation +1.5%, low vacancy, rate -50 bps, 0% haircut"),
-        ("⚖️ Base Case", matrix.base, "#2563eb", "Benchmark appreciation & vacancy, baseline loan rate"),
-        ("⚡ Worst Case (Stress)", matrix.worst, "#dc2626", "Appreciation -2.5%, worst vacancy, rate +200 bps, exit discount"),
+        ("🌟 Good Market", matrix.best, "#059669", "Price growth +1.5%, low vacancy, loan rate -0.5%, full sale price"),
+        ("⚖️ Expected Market", matrix.base, "#2563eb", "Normal area price growth, average vacancy, current loan rate"),
+        ("⚡ Bad Market (Stress)", matrix.worst, "#dc2626", "Price growth -2.5%, long vacancy, loan rate +2%, resale discount"),
     ]
 
     for col, (title, sc_res, border_col, desc) in zip([sc_col1, sc_col2, sc_col3], scenarios_meta):
@@ -1371,13 +1371,13 @@ with tab3:
                     <div>
                         <h3 style="margin:0 0 6px 0; font-size:1.18rem; color:#ffffff; font-weight:700;">{title}</h3>
                         <p style="margin:0 0 12px 0; font-size:0.82rem; color:#94a3b8; line-height:1.4;">{desc}</p>
-                        <div style="margin-bottom:12px;"><span style="color:#94a3b8; font-size:0.88rem;">Equity IRR:</span> <span style="font-size:1.35rem; font-weight:800; color:{border_col}; margin-left:6px;">{irr_val}</span></div>
+                        <div style="margin-bottom:12px;"><span style="color:#94a3b8; font-size:0.88rem;">Annual Return:</span> <span style="font-size:1.35rem; font-weight:800; color:{border_col}; margin-left:6px;">{irr_val}</span></div>
                     </div>
                     <div>
-                        <div style="margin-bottom:6px; font-size:0.88rem; color:#cbd5e1;"><span style="color:#94a3b8;">Terminal Net Equity:</span> <b style="color:#ffffff;">{format_inr(sc_res.exit.net_exit_proceeds)}</b></div>
-                        <div style="margin-bottom:6px; font-size:0.88rem; color:#cbd5e1;"><span style="color:#94a3b8;">Total Operational Drain:</span> <b style="color:#ffffff;">{format_inr(abs(cum_drain))}</b></div>
+                        <div style="margin-bottom:6px; font-size:0.88rem; color:#cbd5e1;"><span style="color:#94a3b8;">Final Cash In Hand:</span> <b style="color:#ffffff;">{format_inr(sc_res.exit.net_exit_proceeds)}</b></div>
+                        <div style="margin-bottom:6px; font-size:0.88rem; color:#cbd5e1;"><span style="color:#94a3b8;">Total Out-of-Pocket Top-Up:</span> <b style="color:#ffffff;">{format_inr(abs(cum_drain))}</b></div>
                         <div style="margin-bottom:6px; font-size:0.88rem; color:#cbd5e1;"><span style="color:#94a3b8;">Year-1 Net Cash Flow:</span> <b style="color:#ffffff;">{format_inr(sc_res.annual_cash_flows[0].net_cash_flow)}</b></div>
-                        <div style="margin-bottom:6px; font-size:0.88rem; color:#cbd5e1;"><span style="color:#94a3b8;">NPV (@ Post-Tax FD):</span> <b style="color:#ffffff;">{format_inr(sc_res.npv_inr)}</b></div>
+                        <div style="margin-bottom:6px; font-size:0.88rem; color:#cbd5e1;"><span style="color:#94a3b8;">Extra Value Today vs. FD:</span> <b style="color:#ffffff;">{format_inr(sc_res.npv_inr)}</b></div>
                     </div>
                 </div>
                 """,
@@ -1407,21 +1407,21 @@ with tab3:
     st.markdown(
         f"""
         <div class="opp-cost-card">
-            <h4 style="margin:0 0 12px 0; color:#ffffff; font-size:1.1rem; font-weight:700;">🍎 Apples-to-Apples Opportunity Cost Takeaway</h4>
+            <h4 style="margin:0 0 12px 0; color:#ffffff; font-size:1.1rem; font-weight:700;">🍎 Profit Comparison vs. Bank FD & Stock Market</h4>
             <div style="display:flex; gap:36px; flex-wrap:wrap;">
                 <div>
-                    <span style="color:#94a3b8; font-size:0.9rem;">Advantage vs SBI Term Deposit:</span><br>
+                    <span style="color:#94a3b8; font-size:0.9rem;">Extra Profit vs. SBI Bank FD:</span><br>
                     <span style="color: {'#34d399' if fd_adv >= 0 else '#f87171'}; font-weight:800; font-size:1.35rem;">
                         {('+' if fd_adv >= 0 else '') + format_inr(fd_adv)}
                     </span>
-                    <span style="font-size:0.84rem; color:#94a3b8; margin-left:6px;"> (IRR Spread: <b style="color:{'#34d399' if base_res.fd_benchmark.irr_spread_pct >= 0 else '#f87171'}">{base_res.fd_benchmark.irr_spread_pct:+.2f}%</b>)</span>
+                    <span style="font-size:0.84rem; color:#94a3b8; margin-left:6px;"> (Return Diff: <b style="color:{'#34d399' if base_res.fd_benchmark.irr_spread_pct >= 0 else '#f87171'}">{base_res.fd_benchmark.irr_spread_pct:+.2f}%</b>)</span>
                 </div>
                 <div>
-                    <span style="color:#94a3b8; font-size:0.9rem;">Advantage vs Nifty 50 TRI:</span><br>
+                    <span style="color:#94a3b8; font-size:0.9rem;">Extra Profit vs. Nifty 50:</span><br>
                     <span style="color: {'#34d399' if nifty_adv >= 0 else '#f87171'}; font-weight:800; font-size:1.35rem;">
                         {('+' if nifty_adv >= 0 else '') + format_inr(nifty_adv)}
                     </span>
-                    <span style="font-size:0.84rem; color:#94a3b8; margin-left:6px;"> (IRR Spread: <b style="color:{'#34d399' if base_res.nifty_benchmark.irr_spread_pct >= 0 else '#f87171'}">{base_res.nifty_benchmark.irr_spread_pct:+.2f}%</b>)</span>
+                    <span style="font-size:0.84rem; color:#94a3b8; margin-left:6px;"> (Return Diff: <b style="color:{'#34d399' if base_res.nifty_benchmark.irr_spread_pct >= 0 else '#f87171'}">{base_res.nifty_benchmark.irr_spread_pct:+.2f}%</b>)</span>
                 </div>
             </div>
         </div>
@@ -1430,7 +1430,7 @@ with tab3:
     )
 
     # Dedicated Stress Test Cards
-    st.markdown("### 🧪 Dedicated Stress Test Cards")
+    st.markdown("### 🧪 What If Things Go Wrong? (Stress Tests)")
     st_col1, st_col2, st_col3 = st.columns(3)
 
     with st_col1:
@@ -1445,9 +1445,9 @@ with tab3:
                         <span class="badge {s1_badge}">{s1.status}</span>
                     </div>
                     <p style="font-size:0.82rem; color:#94a3b8; margin:0 0 12px 0; line-height:1.4;">{s1.description}</p>
-                    <div style="font-size:0.86rem; margin-bottom:5px; color:#cbd5e1;"><span style="color:#94a3b8;">+100 bps EMI:</span> <b style="color:#ffffff;">{format_inr(s1.metrics['emi_plus_100bps'])}</b> <span style="color:#38bdf8;">(+{format_inr(s1.metrics['delta_emi_100bps'])})</span></div>
-                    <div style="font-size:0.86rem; margin-bottom:5px; color:#cbd5e1;"><span style="color:#94a3b8;">+200 bps EMI:</span> <b style="color:#ffffff;">{format_inr(s1.metrics['emi_plus_200bps'])}</b> <span style="color:#f87171;">(+{format_inr(s1.metrics['delta_emi_200bps'])})</span></div>
-                    <div style="font-size:0.86rem; margin-bottom:8px; color:#cbd5e1;"><span style="color:#94a3b8;">Stressed FOIR:</span> <b style="color:{'#34d399' if s1.metrics['stressed_foir_200bps'] <= 40 else ('#fbbf24' if s1.metrics['stressed_foir_200bps'] <= 50 else '#f87171')};">{s1.metrics['stressed_foir_200bps']:.1f}%</b></div>
+                    <div style="font-size:0.86rem; margin-bottom:5px; color:#cbd5e1;"><span style="color:#94a3b8;">If Rate +1% (EMI):</span> <b style="color:#ffffff;">{format_inr(s1.metrics['emi_plus_100bps'])}</b> <span style="color:#38bdf8;">(+{format_inr(s1.metrics['delta_emi_100bps'])})</span></div>
+                    <div style="font-size:0.86rem; margin-bottom:5px; color:#cbd5e1;"><span style="color:#94a3b8;">If Rate +2% (EMI):</span> <b style="color:#ffffff;">{format_inr(s1.metrics['emi_plus_200bps'])}</b> <span style="color:#f87171;">(+{format_inr(s1.metrics['delta_emi_200bps'])})</span></div>
+                    <div style="font-size:0.86rem; margin-bottom:8px; color:#cbd5e1;"><span style="color:#94a3b8;">EMIs % of Income:</span> <b style="color:{'#34d399' if s1.metrics['stressed_foir_200bps'] <= 40 else ('#fbbf24' if s1.metrics['stressed_foir_200bps'] <= 50 else '#f87171')};">{s1.metrics['stressed_foir_200bps']:.1f}%</b></div>
                 </div>
                 <ul style="margin:8px 0 0 0; padding-left:18px; font-size:0.80rem; color:#94a3b8; line-height:1.4;">
                     {''.join(f'<li>{n}</li>' for n in s1.notes)}
@@ -1469,8 +1469,8 @@ with tab3:
                         <span class="badge {s2_badge}">{s2.status}</span>
                     </div>
                     <p style="font-size:0.82rem; color:#94a3b8; margin:0 0 12px 0; line-height:1.4;">{s2.description}</p>
-                    <div style="font-size:0.86rem; margin-bottom:5px; color:#cbd5e1;"><span style="color:#94a3b8;">Additional Cash Drain:</span> <b style="color:#f87171;">{format_inr(s2.metrics['vacancy_cash_drain'])}</b></div>
-                    <div style="font-size:0.86rem; margin-bottom:8px; color:#cbd5e1;"><span style="color:#94a3b8;">Post-Shock Buffer:</span> <b style="color:{'#34d399' if s2.metrics['remaining_buffer_months'] >= 3 else '#f87171'};">{s2.metrics['remaining_buffer_months']:.1f} Months</b></div>
+                    <div style="font-size:0.86rem; margin-bottom:5px; color:#cbd5e1;"><span style="color:#94a3b8;">Extra Cash Needed:</span> <b style="color:#f87171;">{format_inr(s2.metrics['vacancy_cash_drain'])}</b></div>
+                    <div style="font-size:0.86rem; margin-bottom:8px; color:#cbd5e1;"><span style="color:#94a3b8;">Safety Cushion Left:</span> <b style="color:{'#34d399' if s2.metrics['remaining_buffer_months'] >= 3 else '#f87171'};">{s2.metrics['remaining_buffer_months']:.1f} Months</b></div>
                 </div>
                 <ul style="margin:8px 0 0 0; padding-left:18px; font-size:0.80rem; color:#94a3b8; line-height:1.4;">
                     {''.join(f'<li>{n}</li>' for n in s2.notes)}
@@ -1492,9 +1492,9 @@ with tab3:
                         <span class="badge {s3_badge}">{s3.status}</span>
                     </div>
                     <p style="font-size:0.82rem; color:#94a3b8; margin:0 0 12px 0; line-height:1.4;">{s3.description}</p>
-                    <div style="font-size:0.86rem; margin-bottom:5px; color:#cbd5e1;"><span style="color:#94a3b8;">Total Cash Invested (Yr 0-3):</span> <b style="color:#ffffff;">{format_inr(s3.metrics['total_cash_invested_3yr'])}</b></div>
-                    <div style="font-size:0.86rem; margin-bottom:5px; color:#cbd5e1;"><span style="color:#94a3b8;">Net Recovered:</span> <b style="color:#ffffff;">{format_inr(s3.metrics['net_recovered_3yr'])}</b></div>
-                    <div style="font-size:0.86rem; margin-bottom:8px; color:#cbd5e1;"><span style="color:#94a3b8;">Capital Recovery Ratio:</span> <b style="color:{'#34d399' if s3.metrics['capital_recovery_pct'] >= 80 else ('#fbbf24' if s3.metrics['capital_recovery_pct'] >= 60 else '#f87171')};">{s3.metrics['capital_recovery_pct']:.1f}%</b></div>
+                    <div style="font-size:0.86rem; margin-bottom:5px; color:#cbd5e1;"><span style="color:#94a3b8;">Total Cash Put In (Yr 0–3):</span> <b style="color:#ffffff;">{format_inr(s3.metrics['total_cash_invested_3yr'])}</b></div>
+                    <div style="font-size:0.86rem; margin-bottom:5px; color:#cbd5e1;"><span style="color:#94a3b8;">Cash Got Back:</span> <b style="color:#ffffff;">{format_inr(s3.metrics['net_recovered_3yr'])}</b></div>
+                    <div style="font-size:0.86rem; margin-bottom:8px; color:#cbd5e1;"><span style="color:#94a3b8;">% of Cash Recovered:</span> <b style="color:{'#34d399' if s3.metrics['capital_recovery_pct'] >= 80 else ('#fbbf24' if s3.metrics['capital_recovery_pct'] >= 60 else '#f87171')};">{s3.metrics['capital_recovery_pct']:.1f}%</b></div>
                 </div>
                 <ul style="margin:8px 0 0 0; padding-left:18px; font-size:0.80rem; color:#94a3b8; line-height:1.4;">
                     {''.join(f'<li>{n}</li>' for n in s3.notes)}
@@ -1524,8 +1524,8 @@ with tab3:
 # TAB 4: PUNE MICRO-MARKET EXPLORER & COMPARABLES
 # ---------------------------------------------------------
 with tab4:
-    st.markdown("### 🗺️ Pune Micro-Market Yield vs Valuation Matrix")
-    st.caption("Interactive institutional benchmarking across all 43 Pune localities and 4 residential configurations.")
+    st.markdown("### 🗺️ Pune Areas: Rental Return vs. Asking Price")
+    st.caption("Compare all 43 Pune areas and 4 flat sizes to see where rents are high and prices are fair.")
 
     scatter_fig = create_micromarket_scatter_chart(merged_df, sel_pincode, selected_bhk)
     st.plotly_chart(scatter_fig, width="stretch")
@@ -1542,8 +1542,8 @@ with tab4:
     st.markdown("---")
 
     # Zone Risk Overview Table with INSTITUTIONAL_REPORT vs UNDERWRITING_ASSUMPTION tags
-    st.markdown("#### 🛡️ Institutional Zone Risk Benchmarks (`pune_zone_risk_v2.csv`)")
-    st.caption("Knight Frank H1 2026 overhang metrics joined with conservative underwriting haircut and delay models.")
+    st.markdown("#### 🛡️ Pune Zone Resale Speed & Delay Benchmarks (`pune_zone_risk_v2.csv`)")
+    st.caption("Market resale speed data combined with conservative resale discount and builder delay buffers.")
 
     zone_display = zone_df.copy()
     zone_cols = [
@@ -1554,7 +1554,7 @@ with tab4:
     st.dataframe(zone_display[zone_cols], width="stretch", hide_index=True)
 
     # Macro parameters reference
-    with st.expander("📜 Official Pune Statutory Macro Parameters (`pune_macro_constants_v2.csv`)", expanded=False):
+    with st.expander("📜 Official Govt Stamp Duty, Tax & Loan Rules (`pune_macro_constants_v2.csv`)", expanded=False):
         macro_df = pd.DataFrame(list(macro.items()), columns=["Parameter Name", "Value"])
         st.dataframe(macro_df, width="stretch", hide_index=True)
 
@@ -1570,11 +1570,10 @@ with tab4:
 # TAB 5: SENSITIVITY, BREAK-EVEN & EXPECTED VALUE
 # ---------------------------------------------------------
 with tab5:
-    st.markdown("### 🔬 Sensitivity, Break-Even & Expected Value")
+    st.markdown("### 🔬 What-Ifs, Break-Even Growth & Average Profit")
     st.caption(
-        "Institutional depth: what actually drives the outcome, where the deal ties "
-        "its liquid alternatives, and a probability-weighted 'expected' answer you can "
-        "present with confidence."
+        "See what actually drives your profit, how fast the property needs to grow to beat an FD or Nifty 50, "
+        "and your average expected outcome across market scenarios."
     )
 
     # Break-even appreciation vs liquid benchmarks
@@ -1586,9 +1585,9 @@ with tab5:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Break-even Appreciation · vs Post-Tax SBI FD</div>
+                <div class="metric-label">Price Growth Needed · To Beat SBI FD</div>
                 <div class="metric-value" style="color:#fbbf24;">{be_txt}</div>
-                <div class="metric-sub">FD hurdle: {be['fd_post_tax_pct']:.2f}%/yr</div>
+                <div class="metric-sub">FD return after tax: {be['fd_post_tax_pct']:.2f}%/yr</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1599,9 +1598,9 @@ with tab5:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Break-even Appreciation · vs Nifty 50 TRI</div>
+                <div class="metric-label">Price Growth Needed · To Beat Nifty 50</div>
                 <div class="metric-value" style="color:#818cf8;">{be_nifty_txt}</div>
-                <div class="metric-sub">Nifty post-tax IRR: {be['nifty_pct']:.2f}%/yr</div>
+                <div class="metric-sub">Nifty return after tax: {be['nifty_pct']:.2f}%/yr</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1611,22 +1610,22 @@ with tab5:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Your Locality Expected Appreciation</div>
+                <div class="metric-label">Expected Yearly Price Growth Here</div>
                 <div class="metric-value">{cur_appr:.2f}%</div>
-                <div class="metric-sub">Used as the Base-case assumption</div>
+                <div class="metric-sub">Used in your Expected Market case</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
     st.caption(
-        "If the locality's expected appreciation is *above* the break-even, the deal "
-        "is statistically likely to beat that benchmark on a cash-flow-parity basis."
+        "If this area's expected price growth is *above* the growth needed above, "
+        "the property is on track to beat that alternative on identical money invested."
     )
 
     st.markdown("---")
 
     # Tornado: what drives the outcome
-    st.markdown("### 🔀 Value Drivers — Relative Impact")
+    st.markdown("### 🔀 What Moves Your Profit Most?")
     tornado_items = compute_tornado_data(property_obj, financing_obj, investor_obj, macro)
     st.plotly_chart(create_tornado_chart(tornado_items), width="stretch")
     if tornado_items:
@@ -1639,7 +1638,7 @@ with tab5:
     st.markdown("---")
 
     # Sensitivity heatmap
-    st.markdown("### 🌡️ Appreciation × Rent Escalation Sensitivity")
+    st.markdown("### 🌡️ Return % at Different Price & Rent Growth Rates")
     appr_axis, esc_axis, irr_grid = compute_sensitivity_grid(
         property_obj, financing_obj, investor_obj, macro
     )
@@ -1654,26 +1653,25 @@ with tab5:
         width="stretch",
     )
     st.caption(
-        "Find your locality's expected appreciation on the vertical axis and your "
-        "assumed rent growth on the horizontal axis — the colour is the equity IRR "
-        "you should expect across that combination."
+        "Find your expected yearly price growth on the left and your expected yearly rent increase "
+        "along the bottom — the colour shows the annual return (%) you can expect."
     )
 
     st.markdown("---")
 
     # Probability-weighted expected value
-    st.markdown("### 🎲 Probability-Weighted Expected Value")
+    st.markdown("### 🎲 Average Expected Profit Across Market Scenarios")
     st.caption(
-        "Assign your own likelihood to the Best / Base / Worst scenarios; the engine "
-        "folds them into one expected answer."
+        "Set how likely you think the Good, Expected, and Bad market scenarios are; "
+        "we combine them into one average expected outcome."
     )
     pr_c1, pr_c2, pr_c3 = st.columns(3)
     with pr_c1:
-        p_best = st.slider("Probability · Best case (%)", 0, 100, 25, 5)
+        p_best = st.slider("Chance of Good Market (%)", 0, 100, 25, 5)
     with pr_c2:
-        p_base = st.slider("Probability · Base case (%)", 0, 100, 50, 5)
+        p_base = st.slider("Chance of Expected Market (%)", 0, 100, 50, 5)
     with pr_c3:
-        p_worst = st.slider("Probability · Worst case (%)", 0, 100, 25, 5)
+        p_worst = st.slider("Chance of Bad Market (%)", 0, 100, 25, 5)
 
     ev = compute_probability_weighted(
         property_obj, financing_obj, investor_obj, macro,
@@ -1685,7 +1683,7 @@ with tab5:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Expected Terminal Wealth</div>
+                <div class="metric-label">Expected Cash In Hand</div>
                 <div class="metric-value">{format_inr(ev.expected_terminal_wealth)}</div>
                 <div class="metric-sub">vs {format_inr(ev.expected_total_cash_invested)} invested</div>
             </div>
@@ -1697,7 +1695,7 @@ with tab5:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Expected Equity IRR</div>
+                <div class="metric-label">Expected Annual Return</div>
                 <div class="metric-value">{ev_irr}</div>
                 <div class="metric-sub">FD {ev.fd_post_tax_pct:.2f}% · Nifty {ev.nifty_pct:.2f}%</div>
             </div>
@@ -1708,9 +1706,9 @@ with tab5:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">P(Beat Post-Tax FD)</div>
+                <div class="metric-label">Chance of Beating Bank FD</div>
                 <div class="metric-value" style="color:{'#34d399' if ev.p_beat_fd >= 0.5 else '#f87171'};">{ev.p_beat_fd*100:.0f}%</div>
-                <div class="metric-sub">Probability-weighted</div>
+                <div class="metric-sub">Based on your odds</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1719,9 +1717,9 @@ with tab5:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">P(Beat Nifty 50 TRI)</div>
+                <div class="metric-label">Chance of Beating Nifty 50</div>
                 <div class="metric-value" style="color:{'#34d399' if ev.p_beat_nifty >= 0.5 else '#f87171'};">{ev.p_beat_nifty*100:.0f}%</div>
-                <div class="metric-sub">Probability-weighted</div>
+                <div class="metric-sub">Based on your odds</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1730,7 +1728,7 @@ with tab5:
     st.plotly_chart(create_expected_value_chart(ev), width="stretch")
     ev_irr_cap = f"{ev.expected_equity_irr_pct:.2f}%/yr" if ev.expected_equity_irr_pct is not None else "N/A"
     st.caption(
-        f"💡 **Takeaway:** Weighting Best ({p_best}%), Base ({p_base}%), and Worst ({p_worst}%) outcomes gives an expected return of "
+        f"💡 **Takeaway:** Weighting Good ({p_best}%), Expected ({p_base}%), and Bad ({p_worst}%) markets gives an expected return of "
         f"**{ev_irr_cap}** and **{format_inr(ev.expected_terminal_wealth)}** in hand."
     )
 
@@ -1749,15 +1747,15 @@ with tab5:
     cum_int_tax = decomp.get("cumulative_interest_and_tax", 0.0)
     net_wealth = decomp.get("net_wealth_created", base_res.exit.net_exit_proceeds - total_cap_inv)
 
-    st.markdown("### 🧮 Where Your Return Comes From (Exact Net Wealth Bridge)")
+    st.markdown("### 🧮 Where Your Profit Comes From (Step-by-Step)")
     rc1, rc2, rc3, rc4, rc5 = st.columns(5)
     with rc1:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Capital Invested</div>
+                <div class="metric-label">Total Cash Put In</div>
                 <div class="metric-value">{format_inr(total_cap_inv)}</div>
-                <div class="metric-sub">Upfront + cumulative deficits</div>
+                <div class="metric-sub">Down payment + fees + top-ups</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1766,9 +1764,9 @@ with tab5:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Post-Tax Capital Gain</div>
+                <div class="metric-label">Price Gain (After Tax)</div>
                 <div class="metric-value" style="color:{'#34d399' if net_cg >= 0 else '#f87171'};">{format_inr(net_cg)}</div>
-                <div class="metric-sub">After all friction & LTCG</div>
+                <div class="metric-sub">Sale profit after fees & tax</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1777,9 +1775,9 @@ with tab5:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Cumulative NOI</div>
+                <div class="metric-label">Total Net Rent Earned</div>
                 <div class="metric-value" style="color:#34d399;">{format_inr(cum_noi)}</div>
-                <div class="metric-sub">Net rent after vacancy & opex</div>
+                <div class="metric-sub">Rent minus repairs & upkeep</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1788,9 +1786,9 @@ with tab5:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Less: Interest & Tax</div>
+                <div class="metric-label">Minus: Loan Interest & Tax</div>
                 <div class="metric-value" style="color:#f87171;">-{format_inr(cum_int_tax)}</div>
-                <div class="metric-sub">Loan interest + property tax</div>
+                <div class="metric-sub">Bank interest + tax on rent</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1799,9 +1797,9 @@ with tab5:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-label">Net Wealth Created</div>
+                <div class="metric-label">Net Profit Made</div>
                 <div class="metric-value" style="color:#38bdf8; font-weight:800;">{format_inr(net_wealth)}</div>
-                <div class="metric-sub">Additive reconciliation (±₹0)</div>
+                <div class="metric-sub">Exact total profit</div>
             </div>
             """,
             unsafe_allow_html=True,

@@ -110,12 +110,12 @@ def create_acquisition_waterfall_chart(acquisition: AcquisitionCostBreakdown) ->
     )
 
     fig.update_layout(
-        title={"text": "<b>All-In Acquisition Cost Waterfall</b>", "font": {"size": 16, "color": "#f8fafc"}},
+        title={"text": "<b>Total Cost Breakdown (Price + Taxes + Fees)</b>", "font": {"size": 16, "color": "#f8fafc"}},
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         margin={"l": 30, "r": 30, "t": 50, "b": 30},
         yaxis={
-            "title": "Cost (INR)",
+            "title": "Amount (₹)",
             "tickformat": ",.0f",
             "gridcolor": "#1e293b",
             "zerolinecolor": "#334155",
@@ -191,7 +191,7 @@ def create_cash_flow_trajectory_chart(annual_cfs: list[CashFlowYear]) -> go.Figu
         )
 
     fig.update_layout(
-        title={"text": "<b>Operating Cash Flow & Cumulative Trajectory</b>", "font": {"size": 16, "color": "#f8fafc"}},
+        title={"text": "<b>Yearly Rent vs. EMI (Cash Flow Over Time)</b>", "font": {"size": 16, "color": "#f8fafc"}},
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         margin={"l": 30, "r": 30, "t": 60, "b": 30},
@@ -276,7 +276,7 @@ def create_amortization_chart(annual_sched: list[dict[str, float]]) -> go.Figure
         )
 
     fig.update_layout(
-        title={"text": "<b>Loan Amortization & Principal Reduction</b>", "font": {"size": 16, "color": "#f8fafc"}},
+        title={"text": "<b>How Your Loan Shrinks (Interest vs. Loan Payoff)</b>", "font": {"size": 16, "color": "#f8fafc"}},
         barmode="stack",
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
@@ -408,7 +408,7 @@ def create_wealth_trajectory_chart(matrix: ScenarioMatrixResult, holding_period_
         )
 
     fig.update_layout(
-        title={"text": "<b>Wealth Creation Trajectory: Real Estate vs Liquid Benchmarks</b>", "font": {"size": 16, "color": "#f8fafc"}},
+        title={"text": "<b>Your Wealth Over Time: Property vs. SBI FD vs. Nifty 50</b>", "font": {"size": 16, "color": "#f8fafc"}},
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         margin={"l": 30, "r": 125, "t": 50, "b": 30},
@@ -539,7 +539,7 @@ def create_micromarket_scatter_chart(
         )
 
     fig.update_layout(
-        title={"text": "<b>Pune Micro-Market Yield vs Valuation Matrix (43 Localities × 4 BHKs)</b>", "font": {"size": 16, "color": "#f8fafc"}},
+        title={"text": "<b>Pune Areas: Rental Return vs. Asking Price</b>", "font": {"size": 16, "color": "#f8fafc"}},
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         margin={"l": 30, "r": 30, "t": 50, "b": 30},
@@ -627,7 +627,7 @@ def create_sensitivity_heatmap(
             )
         )
     fig.update_layout(
-        title={"text": "<b>Equity IRR Sensitivity: Appreciation × Rent Escalation</b>",
+        title={"text": "<b>Annual Return % at Different Price & Rent Growth Rates</b>",
                "font": {"size": 16, "color": "#f8fafc"}},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
@@ -679,13 +679,13 @@ def create_tornado_chart(items: list[dict]) -> go.Figure:
     )
     fig.update_layout(
         barmode="overlay",
-        title={"text": "<b>Value Drivers — One-at-a-Time Impact (Equity IRR)</b>",
+        title={"text": "<b>What Moves Your Profit Most? (Impact on Annual Return)</b>",
                "font": {"size": 16, "color": "#f8fafc"}},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         margin={"l": 10, "r": 40, "t": 50, "b": 30},
         xaxis={
-            "title": "Equity IRR (%)",
+            "title": "Annual Return (%)",
             "ticksuffix": "%",
             "gridcolor": "#1e293b",
             "zerolinecolor": "#334155",
@@ -723,13 +723,13 @@ def create_expected_value_chart(ev) -> go.Figure:
         )
     )
     fig.update_layout(
-        title={"text": "<b>Probability-Weighted Expected Terminal Wealth</b>",
+        title={"text": "<b>Expected Cash In Hand Across Market Scenarios</b>",
                "font": {"size": 16, "color": "#f8fafc"}},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         margin={"l": 10, "r": 70, "t": 50, "b": 30},
         xaxis={
-            "title": "Net Terminal Wealth (INR)",
+            "title": "Final Cash In Hand (₹)",
             "tickformat": ",.0f",
             "gridcolor": "#1e293b",
             "zerolinecolor": "#334155",

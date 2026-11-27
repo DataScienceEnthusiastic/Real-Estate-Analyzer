@@ -42,33 +42,33 @@ def evaluate_gate_1_affordability(
     # Strict FAIL conditions
     if post_purchase_cash < 0:
         status = "FAIL"
-        reasons.append(f"Insufficient funds: Down payment + closing costs (INR {int(round(required_upfront_cash)):,}) exceed liquid savings (INR {int(round(investor.total_liquid_savings_inr)):,}).")
+        reasons.append(f"Not enough cash upfront: Down payment + buying fees (INR {int(round(required_upfront_cash)):,}) exceed your available savings (INR {int(round(investor.total_liquid_savings_inr)):,}).")
     elif post_purchase_cash < (3.0 * monthly_obligations):
         status = "FAIL"
-        reasons.append(f"Critical liquidity depletion: Remaining liquid cash covers only {metrics['buffer_months_actual']:.1f} months (< 3 months minimum safety floor).")
+        reasons.append(f"Safety net too thin: Leftover cash after buying covers only {metrics['buffer_months_actual']:.1f} months of living costs & EMIs (minimum safe floor is 3 months).")
     elif foir > 0.50:
         status = "FAIL"
-        reasons.append(f"Dangerous leverage: Fixed Obligation to Income Ratio (FOIR) is {foir * 100:.1f}%, exceeding the 50.0% underwriting ceiling.")
+        reasons.append(f"Loan EMI too heavy: Total monthly EMIs take up {foir * 100:.1f}% of your take-home pay, above the 50.0% safe limit.")
 
     # Warning conditions
     if status != "FAIL":
         if post_purchase_cash < min_required_reserve:
             status = "WARN"
             shortfall = min_required_reserve - post_purchase_cash
-            reasons.append(f"Reserve shortfall: Remaining cash (INR {int(round(post_purchase_cash)):,}) is below recommended {investor.emergency_buffer_months_target:.0f}-month reserve + upcoming cash need (INR {int(round(min_required_reserve)):,}; shortfall of INR {int(round(shortfall)):,}).")
+            reasons.append(f"Low emergency buffer: Leftover cash (INR {int(round(post_purchase_cash)):,}) is below your {investor.emergency_buffer_months_target:.0f}-month emergency fund + planned cash need (INR {int(round(min_required_reserve)):,}; short by INR {int(round(shortfall)):,}).")
         if 0.40 < foir <= 0.50:
             status = "WARN"
-            reasons.append(f"Elevated debt ratio: FOIR is {foir * 100:.1f}% (above optimal 40% prudence mark).")
+            reasons.append(f"High EMI load: Monthly EMIs take up {foir * 100:.1f}% of your income (above the comfortable 40% mark).")
 
     if not reasons:
-        reasons.append(f"Pass: FOIR is healthy at {foir * 100:.1f}% and liquid reserves cover {metrics['buffer_months_actual']:.1f} months of obligations.")
+        reasons.append(f"Pass: Monthly EMIs are comfortable at {foir * 100:.1f}% of income and leftover savings cover {metrics['buffer_months_actual']:.1f} months of expenses.")
 
     if status != "FAIL" and upfront_to_savings_pct > 85.0:
-        reasons.append(f"Liquidity Concentration Note: Upfront equity commits {upfront_to_savings_pct:.1f}% of your liquid savings into a single illiquid real estate asset.")
+        reasons.append(f"Concentration Note: This purchase puts {upfront_to_savings_pct:.1f}% of your cash savings into one property, which cannot be sold quickly.")
 
     return GateResult(
         gate_number=1,
-        name="Affordability & Liquidity Safety",
+        name="Affordability & Safety Net",
         status=status,
         metrics=metrics,
         reasons=reasons,
@@ -119,13 +119,13 @@ def evaluate_gate_2_downside_survival(
     # 3. yr3_capital_recovery_ratio < 0.65 AND (holding_period_years < 5 OR upcoming_cash_need_inr > 0)
     if stressed_foir_200 > 0.60:
         status = "FAIL"
-        reasons.append(f"Insolvent debt shock: A +200 bps interest rate hike drives FOIR to {stressed_foir_200 * 100:.1f}%, exceeding the 60.0% insolvency ceiling.")
+        reasons.append(f"Interest rate shock risk: A +2% loan rate hike pushes your EMIs to {stressed_foir_200 * 100:.1f}% of your income, above the 60.0% danger limit.")
     elif remaining_vac_buffer_months < 1.0:
         status = "FAIL"
-        reasons.append(f"Severe liquidity exhaustion: Extended 6-month vacancy shock depletes cash buffer below 1 month ({remaining_vac_buffer_months:.1f} months remaining).")
+        reasons.append(f"Vacancy cash crunch: A 6-month empty period drops your cash buffer below 1 month ({remaining_vac_buffer_months:.1f} months left).")
     elif yr3_capital_recovery_ratio < 0.65 and (has_short_horizon or has_cash_need):
         status = "FAIL"
-        reasons.append(f"Severe capital impairment: Forced distress exit at Year 3 recovers only {yr3_capital_recovery_ratio * 100:.1f}% of invested equity (< 65% floor) combined with short {holding_period_years}y horizon or upcoming cash need.")
+        reasons.append(f"Heavy loss on early sale: A forced sale at Year 3 returns only {yr3_capital_recovery_ratio * 100:.1f}% of the cash you put in (< 65% floor), risky with a short {holding_period_years}y plan or upcoming cash need.")
 
     # Warning conditions:
     # 1. 0.50 < stressed_foir_200bps <= 0.60
@@ -135,29 +135,29 @@ def evaluate_gate_2_downside_survival(
     if status != "FAIL":
         if 0.50 < stressed_foir_200 <= 0.60:
             status = "WARN"
-            reasons.append(f"Tight debt cushion: +200 bps rate shock elevates FOIR to {stressed_foir_200 * 100:.1f}%.")
+            reasons.append(f"Tight EMI cushion: A +2% rate hike pushes your EMIs to {stressed_foir_200 * 100:.1f}% of your income.")
         if remaining_vac_buffer_months < 3.0:
             status = "WARN"
-            reasons.append(f"Vulnerable vacancy buffer: 6-month vacancy reduces reserves to {remaining_vac_buffer_months:.1f} months.")
+            reasons.append(f"Thin vacancy buffer: A 6-month empty period shrinks your cash reserves to {remaining_vac_buffer_months:.1f} months.")
         if is_low_liquidity:
             status = "WARN"
-            reasons.append(f"Overhang risk: Micro-market liquidity tier is '{property_input.liquidity_tier}' ({property_input.quarters_to_sell:.1f} quarters to liquidate, benchmark threshold 6.0 quarters).")
+            reasons.append(f"Slow resale market: Area resale speed is '{property_input.liquidity_tier}' (about {property_input.quarters_to_sell:.1f} quarters to sell, vs. 6.0-quarter comfort limit).")
         if yr3_capital_recovery_ratio < 0.75:
             status = "WARN"
-            reasons.append(f"Distress liquidation loss: Forced exit at Year 3 recovers {yr3_capital_recovery_ratio * 100:.1f}% of capital (below 75.0% prudence mark).")
+            reasons.append(f"Early-sale loss risk: A forced sale at Year 3 returns {yr3_capital_recovery_ratio * 100:.1f}% of your cash put in (below the 75.0% safe mark).")
 
     if not reasons:
-        reasons.append(f"Pass: Stressed FOIR at +200 bps remains viable ({stressed_foir_200 * 100:.1f}%), vacancy shock leaves {remaining_vac_buffer_months:.1f} months of buffer, and Year-3 capital recovery is healthy at {yr3_capital_recovery_ratio * 100:.1f}%.")
+        reasons.append(f"Pass: Even with a +2% rate hike, EMIs stay manageable ({stressed_foir_200 * 100:.1f}% of income), a 6-month vacancy leaves {remaining_vac_buffer_months:.1f} months of cash buffer, and Year-3 exit recovers {yr3_capital_recovery_ratio * 100:.1f}% of your cash.")
 
     # Contextual Governance Advisories (Informational)
     if property_input.jurisdiction.lower() == "cantonment":
-        reasons.append("Cantonment Title Risk: Verify freehold vs. Old Grant / leasehold tenure and Pune Cantonment Board FSI/redevelopment restrictions.")
+        reasons.append("Cantonment Area Title Check: Verify freehold vs. Old Grant / leasehold ownership and Pune Cantonment Board building/redevelopment rules.")
     if property_input.quarters_to_sell < 1.0:
-        reasons.append("Liquidity Proxy Note: Sub-1.0 QTS reflects low primary developer inventory in a mature micro-market; secondary resale liquidation typically takes 3–6 months.")
+        reasons.append("Resale Time Note: Low unsold builder stock (< 1 quarter) shows a mature area; reselling an individual flat usually still takes 3–6 months.")
 
     return GateResult(
         gate_number=2,
-        name="Downside Survival & Liquidity Risk",
+        name="Tough Times & Resale Risk",
         status=status,
         metrics=metrics,
         reasons=reasons,
@@ -205,28 +205,28 @@ def evaluate_gate_3_yield_valuation(
     # Severe cash-flow deficit exceeding disposable capacity
     if monthly_cash_deficit > (monthly_disposable_surplus + 0.10 * investor.net_monthly_income_inr):
         status = "FAIL"
-        reasons.append(f"Unfunded deficit: Year-1 monthly operating cash drain (INR {int(round(monthly_cash_deficit)):,}) outstrips monthly disposable cash flow (INR {int(round(monthly_disposable_surplus)):,}).")
+        reasons.append(f"Monthly shortfall too high: Year-1 extra monthly cost (INR {int(round(monthly_cash_deficit)):,}) is higher than your spare monthly income (INR {int(round(monthly_disposable_surplus)):,}).")
 
     if status != "FAIL":
         if market_to_rr_ratio > 2.50:
             status = "WARN"
-            reasons.append(f"Valuation stretch: Market price is {market_to_rr_ratio:.2f}x the government Ready Reckoner benchmark (benchmark threshold 2.5x).")
+            reasons.append(f"Price looks high vs. govt rate: Asking price is {market_to_rr_ratio:.2f}x the government Ready Reckoner rate (comfort limit 2.5x).")
         if property_input.use_case == "investment_rental" and net_rental_yield < 2.0:
             status = "WARN"
-            reasons.append(f"Sub-optimal yield: Net rental yield is {net_rental_yield:.2f}%, well below standard commercial/residential inflation hurdle (2.0%).")
+            reasons.append(f"Low rental return: Net rental return is {net_rental_yield:.2f}% per year, below the 2.0% minimum benchmark.")
         if monthly_cash_deficit > monthly_disposable_surplus and monthly_cash_deficit > 0:
             status = "WARN"
-            reasons.append(f"Cash flow drag: Monthly out-of-pocket deficit (INR {int(round(monthly_cash_deficit)):,}) requires partial liquidation of other reserves.")
+            reasons.append(f"Monthly out-of-pocket drain: Extra monthly cost (INR {int(round(monthly_cash_deficit)):,}) requires dipping into other savings.")
 
     if not reasons:
-        reasons.append(f"Pass: Net yield is {net_rental_yield:.2f}%, market/RR ratio is balanced ({market_to_rr_ratio:.2f}x), and operating cash flow is sustainable.")
+        reasons.append(f"Pass: Net rental return is {net_rental_yield:.2f}%, price vs. govt rate is reasonable ({market_to_rr_ratio:.2f}x), and monthly cash flow is manageable.")
 
     if property_input.use_case == "investment_rental" and base_res.year_1_dscr is not None and base_res.year_1_dscr < 0.50:
-        reasons.append(f"Debt Coverage Note: Year-1 DSCR is {base_res.year_1_dscr:.2f}x (rent covers {base_res.year_1_dscr*100:.0f}% of EMI; remaining {100-base_res.year_1_dscr*100:.0f}% requires ongoing salary subsidy).")
+        reasons.append(f"Rent vs. EMI Note: Year-1 rent covers {base_res.year_1_dscr*100:.0f}% of your EMI ({base_res.year_1_dscr:.2f}x); the remaining {100-base_res.year_1_dscr*100:.0f}% must come from your salary.")
 
     return GateResult(
         gate_number=3,
-        name="Cash Flow, Yield & Valuation Sanity",
+        name="Rent, Monthly Cost & Fair Price",
         status=status,
         metrics=metrics,
         reasons=reasons,
@@ -276,33 +276,33 @@ def evaluate_gate_4_wealth_creation(
 
     if equity_irr is None:
         status = "FAIL"
-        reasons.append("Zero/Negative equity return: The investment yields negative equity IRR across the holding period.")
+        reasons.append("Loss-making return: Your money earns a negative annual return over this holding period.")
     elif property_input.use_case == "investment_rental":
         if equity_irr <= fd_rate:
             status = "FAIL"
-            reasons.append(f"Destroys capital efficiency: Equity IRR ({equity_irr:.2f}%) fails to beat the risk-free post-tax SBI FD rate ({fd_rate:.2f}%).")
+            reasons.append(f"Worse than a Bank FD: Your annual return ({equity_irr:.2f}%) is lower than a safe post-tax SBI FD ({fd_rate:.2f}%).")
         elif equity_irr >= risk_adjusted_hurdle:
             status = "PASS"
             nifty_irr_str = f"{nifty_post_tax_irr:.2f}%" if nifty_post_tax_irr is not None else f"{nifty_cagr:.2f}%"
-            reasons.append(f"Pass: Base Equity IRR ({equity_irr:.2f}%) clears the risk-adjusted hurdle ({risk_adjusted_hurdle:.2f}%, risk-free post-tax FD + 400 bps premium). Post-tax Nifty 50 TRI comparison ({nifty_irr_str} post-tax IRR): RE terminal INR {int(round(re_terminal_equity)):,} vs Nifty INR {int(round(nifty_terminal)):,} (spread: {base_res.nifty_benchmark.irr_spread_pct:+.2f} pp).")
+            reasons.append(f"Pass: Your annual return ({equity_irr:.2f}%) clears the post-tax FD + 4% extra reward target ({risk_adjusted_hurdle:.2f}%). vs. Nifty 50 ({nifty_irr_str} after tax): Property gives INR {int(round(re_terminal_equity)):,} vs. Nifty INR {int(round(nifty_terminal)):,} (difference: {base_res.nifty_benchmark.irr_spread_pct:+.2f}%).")
         else:
             status = "WARN"
-            reasons.append(f"Thin risk premium: Base Equity IRR ({equity_irr:.2f}%) beats risk-free post-tax FD ({fd_rate:.2f}%), but fails to achieve the 400 bps risk premium ({risk_adjusted_hurdle:.2f}% hurdle).")
+            reasons.append(f"Low extra reward: Your annual return ({equity_irr:.2f}%) beats a post-tax SBI FD ({fd_rate:.2f}%), but misses the +4% extra reward target ({risk_adjusted_hurdle:.2f}%) for property risk.")
     else:
         # self_use
         if equity_irr < fd_rate - 1.0:
             status = "FAIL"
-            reasons.append(f"Severe equity drag: Self-use Base Equity IRR ({equity_irr:.2f}%) lags risk-free post-tax FD by over 100 bps ({fd_rate:.2f}%).")
+            reasons.append(f"High financial cost for self-use: Your annual return ({equity_irr:.2f}%) trails a safe post-tax SBI FD ({fd_rate:.2f}%) by more than 1%.")
         elif equity_irr >= fd_rate + 2.0 or re_terminal_equity >= 0.90 * fd_terminal:
             status = "PASS"
-            reasons.append(f"Pass: Self-use equity return ({equity_irr:.2f}%) satisfies housing utility with viable capital preservation vs risk-free FD ({fd_rate:.2f}%).")
+            reasons.append(f"Pass: Self-use annual return ({equity_irr:.2f}%) preserves wealth well compared to a safe Bank FD ({fd_rate:.2f}%) while giving you a home.")
         else:
             status = "WARN"
-            reasons.append(f"Moderate equity drag: Base Equity IRR ({equity_irr:.2f}%) provides modest return relative to liquid FD ({fd_rate:.2f}%).")
+            reasons.append(f"Modest return for self-use: Your annual return ({equity_irr:.2f}%) is somewhat lower than keeping cash in a liquid Bank FD ({fd_rate:.2f}%).")
 
     return GateResult(
         gate_number=4,
-        name="Wealth Creation & Opportunity Cost",
+        name="Profit vs. Bank FD & Stock Market",
         status=status,
         metrics=metrics,
         reasons=reasons,
@@ -352,17 +352,17 @@ def evaluate_master_verdict(
     ):
         status = "NO-GO"
         color = "red"
-        summary = "CRITICAL RISK: Deal breaches mandatory solvency, downside risk survival, or minimum capital efficiency gates. Proceeding risks capital destruction or insolvency."
+        summary = "HIGH RISK — DO NOT BUY AS-IS: This deal fails essential safety checks (affordability, surviving tough times, or beating a basic Bank FD)."
     # 2. GO (Green): All 4 gates PASS
     elif all(g.status == "PASS" for g in all_gates):
         status = "GO"
         color = "green"
-        summary = "HIGH CONVICTION: Deal satisfies all 4 underwriting gates across affordability, downside survival, valuation sanity, and opportunity cost."
+        summary = "STRONG BUY: This deal passes all 4 safety checks — affordable EMIs, safe cash buffer, fair price, and solid returns vs. Bank FD."
     # 3. CAUTION (Amber): All remaining cases
     else:
         status = "CAUTION"
         color = "amber"
-        summary = "CONDITIONAL / CAUTION: Deal is financially survivable, but carries valuation stretches, low rental yield, or underperforms liquid benchmarks."
+        summary = "PROCEED WITH CARE: You can afford the EMIs, but watch out for a high asking price, low rental return, or lower profit than safer options."
 
     return MasterVerdict(
         status=status,
